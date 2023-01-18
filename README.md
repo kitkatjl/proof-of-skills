@@ -1,1 +1,1 @@
-# proof-of-skills
+This depository is used to depict various tasks and exercises, small projects I have completed in order to prove skills. Please, note that the tasks themselves do not belong to me and come from various professors of different institutions I have attended as well as books. Group tasks in which the authorship of the code does not solely belong to me are marked accordingly.
