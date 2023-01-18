@@ -1,0 +1,131 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+rm(list = ls())
+
+library(vars)
+library(tseries)
+library(tidyverse)
+library(urca)
+library(forecast)
+library(stargazer)
+library(matlib)
+library(pracma)
+
+
+#Structural form matrices
+B <- cbind(c(1, -0.1), c(-0.2, 1))
+B_0 <- rbind(c(0.15) ,c(0.07))
+B_1 <- cbind(c(0.4, 0.3), c(0.17, 0.35))
+B_2 <- cbind(c(0.05, 0), c(0.19, 0.11))
+
+
+#Reduced form matrices
+A_0 <- inv(B) %*% B_0
+A_1 <- inv(B) %*% B_1
+A_2 <- inv(B) %*% B_2
+
+#First two observations of the time series
+x <- c(0.8  , 1.5) 
+y <- c(-0.5, 0.7)
+
+variables <- cbind(x, y)
+variables <- as.data.frame(variables)
+
+# Generating VAR(2)
+set.seed(123)
+for (t in 3:2000)
+{
+  variables_lag1 <- t(variables[t-1,])
+  variables_lag2 <- t(variables[t-2,])
+  
+  e <- rnorm(2, mean = 0, sd = 1)
+  e <- as.matrix(e)
+  
+  variables_t <- A_0 + A_1 %*% variables_lag1 + A_2 %*% variables_lag2 + inv(B) %*% e
+  variables_t <- t(variables_t)
+  
+  variables[t,] <- variables_t
+}
+
+
+#VAR(1)
+x<-ts(variables$x)
+y<-ts(variables$y)
+
+#check X for integration
+plot.ts(x)
+
+#DF test
+adf1_x=ur.df(x, type="none", selectlags ="AIC") # number of lags based upon the AIC 
+summary(adf1_x)
+
+adf.test(diff(x), k=1)
+ggtsdisplay(x)
+
+#check Y for integration
+plot.ts(y)
+
+#DF test
+adf1_y=ur.df(y, type="none", selectlags ="AIC") # number of lags based upon the AIC 
+summary(adf1_y)
+
+adf.test(diff(y), k=1)
+ggtsdisplay(y)
+
+#find optimal lag length
+
+mydata = variables
+lag <-VARselect(mydata, lag.max=5)
+lag
+lag$selection
+
+#estimate the model
+model <-VAR(mydata, p=1)
+summary(model)
+
+
+stargazer(model[["varresult"]], type='text')
+
+#normaility
+norm1<-normality.test(model, multivariate.only=TRUE)
+norm1
+
+#ABSENCE of serial correlation
+serial1<-serial.test(model, lags.pt=2)
+serial1
+
+#stability
+vars::roots(model, modulus=TRUE) # in the unit circle
+
+
+#granger
+granger1<- causality(model, cause = "y")
+granger1
+
+granger2<- causality(model, cause = "x")
+granger2
+```
+```{r}
+#IRF
+IRF1<-irf(model,impulse ="y", response = "x", n.ahead=20, boot=TRUE, runs=100, ci=0.95)
+IRF1$irf
+plot(IRF1, ylab="x", main="Response of x to the shock in y")
+
+IRF1<-irf(model,impulse ="x", response = "y", n.ahead=20, boot=TRUE, runs=100, ci=0.95)
+IRF1$irf
+plot(IRF1, ylab="y", main="Response of y to the shock in x")
+
+IRF2<-irf(model,impulse ="x", response = "x", n.ahead=20, boot=TRUE, runs=100, ci=0.95)
+IRF1$irf
+plot(IRF2, ylab="x", main="Response of x to the shock in x")
+
+IRF3<-irf(model,impulse ="y", response = "y", n.ahead=20, boot=TRUE, runs=100, ci=0.95)
+IRF1$irf
+plot(IRF3, ylab="y", main="Response of y to the shock in y")
+```
+
+
