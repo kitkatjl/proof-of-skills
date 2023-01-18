@@ -1,0 +1,216 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+rm(list = ls())
+
+library(aTSA)
+library(vars)
+library(tseries)
+library(tidyverse)
+library(urca)
+library(dynlm)
+library(zoo)
+library(stargazer)
+library(haven)
+library(tsDyn)
+library(vars)
+library(urca)
+library(forecast)
+library(tidyverse)
+```
+
+```{r}
+#JOHANSEN
+rm(list = ls())
+df <- read_dta("m1gdp.dta")
+df <- na.omit(df)
+y <- ts(df$ln_gdp)
+z <- ts(df$ln_m1)
+dset <- cbind(y, z)
+
+#Lags?
+lagselect <- VARselect(dset, lag.max = 7, type = "const")
+lagselect
+#3 lags
+```
+
+```{r}
+#Johansen Testing (Trace)
+ctest1t <- ca.jo(dset, type = "trace", ecdet = "const", K = 3)
+summary(ctest1t)
+
+#Johansen Testing (MaxEigen)
+ctest1e <- ca.jo(dset, type = "eigen", ecdet = "const", K = 3)
+summary(ctest1e)
+#1 cointegrating relationship
+```
+
+```{r}
+#VECM
+#VECM to VAR
+Model1VAR <- vec2var(ctest1t, r = 1)
+```
+
+```{r}
+#Tests
+Serial1 <- serial.test(Model1VAR, lags.pt = 5, type = "PT.asymptotic")
+Serial1
+# There is no serial correlation
+```
+
+```{r}
+#Normality of Residuals
+Norm1 <- normality.test(Model1VAR, multivariate.only = TRUE)
+Norm1
+```
+
+
+
+```{r}
+#IRF
+irf_zy <- irf(Model1VAR, impulse = "z", response = "y", n.ahead = 20, boot = TRUE)
+plot(irf_zy, ylab = "y", main = "z's shock to y")
+
+irf_yy <- irf(Model1VAR, impulse = "y", response = "y", n.ahead = 20, boot = TRUE)
+plot(irf_yy, ylab = "y", main = "y shock to y")
+
+irf_yz <- irf(Model1VAR, impulse = "y", response = "z", n.ahead = 20, boot = TRUE)
+plot(irf_yz, ylab = "GDP", main = "y's shock to z")
+
+irf_zz <- irf(Model1VAR, impulse = "z", response = "z", n.ahead = 20, boot = TRUE)
+plot(irf_yy, ylab = "z", main = "z shock to z")
+```
+
+```{r}
+#Variance Decomposition
+FEVD1 <- fevd(Model1VAR, n.ahead = 10)
+plot(FEVD1)
+```
+
+```{r}
+# EG
+rm(list = ls())
+
+df <- read_dta("m1gdp.dta")
+df <- na.omit(df)
+y <- ts(df$ln_gdp)
+z <- ts(df$ln_m1)
+dset <- cbind(y, z)
+plot(y, col = "red", ylim = c(5,9))
+lines(z, col = "blue")
+adf_y=ur.df(y, type = "none", lags = 4)  
+summary(adf_y)
+# the data is non-stationary
+
+adf2_y =ur.df(diff(y),type = "none", lags = 4)
+summary(adf2_y)
+# the data is stationary
+
+adf_z=ur.df(z, type = "none", lags = 4)  
+summary(adf_z)
+# the data is non-stationary
+
+adf2_z =ur.df(diff(z),type = "none", lags = 4)
+summary(adf2_z)
+# the data is stationary
+```
+
+```{r}
+#ACF and PACF
+acf(y)
+pacf(y)
+ggtsdisplay(y)
+
+acf(diff(y))
+pacf(diff(y))
+ggtsdisplay(diff(y))
+
+
+acf(z)
+pacf(z)
+ggtsdisplay(z)
+
+acf(diff(z))
+pacf(diff(z))
+ggtsdisplay(diff(z))
+```
+
+```{r}
+#LR
+LR<-lm(y ~ z)
+summary(LR)
+u_hat=residuals(LR)
+plot(u_hat)
+
+acf(u_hat)
+pacf(u_hat)
+ggtsdisplay(u_hat)
+
+adf_u=ur.df(u_hat, type = "none", lags = 4)  
+summary(adf_u)
+adf.test(u_hat, k = 1)
+# the data is non-stationary
+```
+
+```{r}
+#differenciated data
+y<-diff(y)
+z<-diff(z)
+mydata=cbind(y, z)
+
+lag_select <-VARselect(mydata, lag.max=5)
+lag_select
+# 2 lags
+```
+
+```{r}
+model <- VAR(mydata, p = 2)
+summary(model)
+```
+
+```{r}
+#IRF
+irf_zy <- irf(model, impulse = "z", response = "y", n.ahead = 20, boot = TRUE)
+plot(irf_zy, ylab = "y", main = "z's shock to y")
+
+irf_yy <- irf(model, impulse = "y", response = "y", n.ahead = 20, boot = TRUE)
+plot(irf_yy, ylab = "y", main = "y shock to y")
+
+irf_yz <- irf(model, impulse = "y", response = "z", n.ahead = 20, boot = TRUE)
+plot(irf_yz, ylab = "GDP", main = "y's shock to z")
+
+irf_zz <- irf(model, impulse = "z", response = "z", n.ahead = 20, boot = TRUE)
+plot(irf_yy, ylab = "z", main = "z shock to z")
+
+```
+
+```{r}
+#if u_hat is stationary
+lag_select <-VARselect(dset, lag.max=5)
+lag_select
+#3 lags
+```
+
+```{r}
+d.y<-diff(y)
+d.z<-diff(z)
+mydata=cbind(d.y, d.z)
+
+lag_select2 <-VARselect(mydata, lag.max=5)
+lag_select2
+#2 lags
+
+lu_hat = as.data.frame(u_hat)
+lu_hat<- lu_hat[-1, ]
+
+
+vecm.eg <- VECM(dset, lag = 2, estim = "2OLS") 
+summary(vecm.eg)
+stargazer(vecm.eg$coefficients,
+          type="html",
+          out="results_1.doc")
+```
+
