@@ -1,0 +1,406 @@
+---
+title: 'TA_4 output: word_document'
+output: word_document
+---
+# Part 1
+```{r }
+
+library(systemfit)
+dt <- read.csv("TableF10-2.csv")
+
+#fitted shares
+attach(dt)
+sk_mod <- K~log(Pk/Pm)+log(Pl/Pm)+log(Pe/Pm)
+sl_mod <- L~log(Pk/Pm)+log(Pl/Pm)+log(Pe/Pm)
+se_mod <- E~log(Pk/Pm)+log(Pl/Pm)+log(Pe/Pm)
+eq_sys <- list(sk_mod,sl_mod,se_mod)
+restrict <- c("eq1_log(Pl/Pm)-eq2_log(Pk/Pm)=0", "eq1_log(Pe/Pm)-eq3_log(Pk/Pm)=0", "eq2_log(Pe/Pm)-eq3_log(Pl/Pm)=0") 
+sur_mod <- systemfit(eq_sys, data=dt, method="SUR", restrict.matrix = restrict)
+detach(dt)
+sk <- as.numeric(fitted(sur_mod)[13,1])
+sl <- as.numeric(fitted(sur_mod)[13,2])
+se <- as.numeric(fitted(sur_mod)[13,3])
+sm <- 1-sum(sk,sl,se)
+
+#Table: Cost Shares for 1959
+table1 <- data.frame(rbind(c(sk, sl, se, sm), 
+                           c(dt[13,3], dt[13,4], dt[13,5], dt[13,6])))
+names(table1) <- c('Capital', 'Labor', 'Energy', 'Materials')
+rownames(table1) <- c('Fitted shares', 'Actual shares')
+table1 <- round(table1,5)
+table1
+
+#Elasticities_preparing
+sur_mod$coefficients
+del_km <- (-1)*sum(sur_mod$coefficients[2],sur_mod$coefficients[3],sur_mod$coefficients[4])
+del_lm <- (-1)*sum(sur_mod$coefficients[6],sur_mod$coefficients[7],sur_mod$coefficients[8])
+del_em <- (-1)*sum(sur_mod$coefficients[10],sur_mod$coefficients[11],sur_mod$coefficients[12])
+del_mm <- (-1)*sum(del_km,del_lm,del_em)
+
+#Implied Elasticities of Substitution, 1959
+elast_kk <- as.numeric((sur_mod$coefficients[2]+sk*(sk-1))/(sk^2))
+elast_ll <- as.numeric((sur_mod$coefficients[7]+sl*(sl-1))/(sl^2))
+elast_ee <- as.numeric((sur_mod$coefficients[12]+se*(se-1))/(se^2))
+elast_mm <- as.numeric((del_mm+sm*(sm-1))/(sm^2))
+elast_kl <- as.numeric((sur_mod$coefficients[3]+sk*sl)/(sk*sl))
+elast_ke <- as.numeric((sur_mod$coefficients[4]+sk*se)/(sk*se))
+elast_km <- as.numeric((del_km+sk*sm)/(sk*sm))
+elast_le <- as.numeric((sur_mod$coefficients[8]+sl*se)/(se*sl))
+elast_lm <- as.numeric((del_lm+sm*sl)/(sm*sl))
+elast_em <- as.numeric((del_em+sm*se)/(sm*se))
+
+
+#Table: Implied Elasticities of Substitution, 1959
+table2 <- data.frame(rbind(c(round(elast_kk,5), " ", " ", " "), 
+                           c(round(elast_kl,5), round(elast_ll, 5)," ", " "),
+                           c(round(elast_ke, 5), round(elast_le, 5), round(elast_ee, 5), " "),
+                           c(round(elast_km, 5), round(elast_lm, 5), round(elast_em, 5), round(elast_mm,5))))
+names(table2) <- c('Capital', 'Labor', 'Energy', 'Materials')
+rownames(table2) <- c('Capital', 'Labor', 'Energy', 'Materials')
+table2
+
+#Implied Own Price Elasticities
+own_k <- sk*elast_kk
+own_l <- sl*elast_ll
+own_e <- se*elast_ee
+own_m <- sm*elast_mm
+
+#Table: Implied Own Price Elasticities
+table3 <- data.frame(rbind(c(own_k, own_l, own_e, own_m)))
+names(table3) <- c('Capital', 'Labor', 'Energy', 'Materials')
+rownames(table3) <- c('Implied Own Price Elasticities')
+table3 <- round(table3,5)
+table3
+```
+# Part 2
+
+```{r, echo=FALSE}
+library(wooldridge)
+library(stargazer)
+library(dplyr)
+library(corrplot)
+library(car)
+library(jtools)
+library(tidyverse)
+library(haven)
+library(lmtest)
+library(skedastic)
+library(sandwich)
+library(margins)
+library(robustbase)
+library(ivreg)
+library(systemfit)
+```
+
+
+```{r, echo=TRUE}
+#1
+rm(list=ls())
+set.seed(123)
+nobs<-1000
+a0<-10
+a2<-11
+a3<-9
+b0<-13
+b2<-15
+```
+```{r echo=TRUE}
+#2
+z1 <- rnorm(nobs,0,1)
+z2 <- rnorm(nobs,0,1)
+z3 <- rnorm(nobs,0,1)
+hist(z1)
+```
+```{r echo=TRUE}
+#3
+r = 0.5
+Sigma=matrix(c(1,r,r,1), nrow=2)
+df = MASS::mvrnorm(nobs, mu=c(0,0), Sigma=Sigma, empirical=TRUE)
+df <- as.data.frame(df)
+colnames(df)[1] <- "u1"
+colnames(df)[2] <- "u2"
+var(df["u1"]) 
+var(df["u2"]) 
+cov(df["u1"], df["u2"]) 
+```
+
+```{r}
+#4
+p<-a0+a2*z1+a3*z2+df$u1
+q<-b0+b2*z3+df$u2
+```
+```{r}
+#5
+reg<-lm(p~z1+z2)
+reg1<-lm(q~z3)
+stargazer(reg, reg1, type = "text")
+```
+```{r}
+#6
+price<- p~z1+z2
+quant<-q~z3
+eqSystem <- list( p = price, q = quant)
+sur <- systemfit(eqSystem, method="SUR")
+summary(sur)
+```
+```{r}
+#7
+a0_hat_sur = NULL
+b0_hat_sur = NULL
+z1_hat_sur = NULL
+z2_hat_sur = NULL
+z3_hat_sur = NULL
+a0_hat_ols = NULL
+b0_hat_ols = NULL
+z1_hat_ols = NULL
+z2_hat_ols = NULL
+z3_hat_ols = NULL
+for(sample in 1:1500) {
+  #print(sample)
+  r = 0.5
+  Sigma=matrix(c(1,r,r,1), nrow=2)
+  df = MASS::mvrnorm(nobs, mu=c(0,0), Sigma=Sigma, empirical=TRUE)
+  df <- as.data.frame(df)
+  colnames(df)[1] <- "u1"
+  colnames(df)[2] <- "u2"
+  
+  p<-a0+a2*z1+a3*z2+df$u1
+  q<-b0+b2*z3+df$u2
+  
+  #5
+  reg<-lm(p~ z1+z2)
+  reg1<-lm(q~ z3)
+
+  a0_hat_ols = reg$coefficients[1]
+  z1_hat_ols = reg$coefficients[2]
+  z2_hat_ols = reg$coefficients[3]
+  b0_hat_ols = reg1$coefficients[1]
+  z3_hat_ols = reg1$coefficients[2]
+  
+  #6
+  price<- p~z1+z2
+  quant<-q~z3
+  eqSystem <- list( p = price, q = quant)
+  sur <- systemfit(eqSystem, method="SUR")
+
+  a0_hat_sur = sur$coefficients[1]
+  z1_hat_sur = sur$coefficients[2]
+  z2_hat_sur = sur$coefficients[3]
+  b0_hat_sur = sur$coefficients[4]
+  z3_hat_sur = sur$coefficients[5]
+}
+
+mean(a0_hat_ols)
+mean(b0_hat_ols)
+mean(z1_hat_ols)
+mean(z2_hat_ols)
+mean(z3_hat_ols)
+
+mean(a0_hat_sur)
+mean(b0_hat_sur)
+mean(z1_hat_sur)
+mean(z2_hat_sur)
+mean(z3_hat_sur)
+
+```
+
+```{r}
+#8
+#nobs = 500
+nobs = 5000
+
+#r = 0
+r = -0.5
+#r = 0.5
+
+z1 <- rnorm(nobs,0,1)
+z2 <- rnorm(nobs,0,1)
+z3 <- rnorm(nobs,0,1)
+a0_hat_sur = NULL
+b0_hat_sur = NULL
+z1_hat_sur = NULL
+z2_hat_sur = NULL
+z3_hat_sur = NULL
+a0_hat_ols = NULL
+b0_hat_ols = NULL
+z1_hat_ols = NULL
+z2_hat_ols = NULL
+z3_hat_ols = NULL
+
+for(sample in 1:1500) {
+   #print(sample)
+  Sigma=matrix(c(1,r,r,1), nrow=2)
+  df = MASS::mvrnorm(nobs, mu=c(0,0), Sigma=Sigma, empirical=TRUE)
+  df <- as.data.frame(df)
+  colnames(df)[1] <- "u1"
+  colnames(df)[2] <- "u2"
+  
+  p<-a0+a2*z1+a3*z2+df$u1
+  q<-b0+b2*z3+df$u2
+
+  #5
+  reg<-lm(p~ z1+z2)
+  reg1<-lm(q~ z3)
+
+  a0_hat_ols = reg$coefficients[1]
+  z1_hat_ols = reg$coefficients[2]
+  z2_hat_ols = reg$coefficients[3]
+  b0_hat_ols = reg1$coefficients[1]
+  z3_hat_ols = reg1$coefficients[2]
+  
+  #6
+  price<- p~z1+z2
+  quant<-q~z3
+  eqSystem <- list( p = price, q = quant)
+  sur <- systemfit(eqSystem, method="SUR")
+
+  a0_hat_sur = sur$coefficients[1]
+  z1_hat_sur = sur$coefficients[2]
+  z2_hat_sur = sur$coefficients[3]
+  b0_hat_sur = sur$coefficients[4]
+  z3_hat_sur = sur$coefficients[5]
+
+}
+
+mean(a0_hat_ols)
+mean(b0_hat_ols)
+mean(z1_hat_ols)
+mean(z2_hat_ols)
+mean(z3_hat_ols)
+
+(D1 = abs(mean(a0_hat_ols) - a0) +
+abs(mean(b0_hat_ols) - b0) +
+abs(mean(z1_hat_ols) - a2) +
+abs(mean(z2_hat_ols) - a3) +
+abs(mean(z3_hat_ols) - b2))
+
+mean(a0_hat_sur)
+mean(b0_hat_sur)
+mean(z1_hat_sur)
+mean(z2_hat_sur)
+mean(z3_hat_sur)
+
+(D2 = abs(mean(a0_hat_sur) - a0) +
+abs(mean(b0_hat_sur) - b0) +
+abs(mean(z1_hat_sur) - a2) +
+abs(mean(z2_hat_sur) - a3) +
+abs(mean(z3_hat_sur) - b2))
+
+```
+```{r}
+#9
+a0_hat_sur = NULL
+a1_hat_sur = NULL
+a2_hat_sur = NULL
+a3_hat_sur = NULL
+b0_hat_sur = NULL
+b1_hat_sur = NULL
+b2_hat_sur = NULL
+b3_hat_sur = NULL
+
+a0_hat_ols = NULL
+a1_hat_ols = NULL
+a2_hat_ols = NULL
+a3_hat_ols = NULL
+b0_hat_ols = NULL
+b1_hat_ols = NULL
+b2_hat_ols = NULL
+b3_hat_ols = NULL
+
+a0<-10
+a1<-11
+a2<-12
+a3<-13
+b0<-14
+b1<-15
+b2<-16
+b3<-17
+
+nobs = 500
+#nobs = 5000
+
+r = 0
+r = -0.5
+#r = 0.5
+
+z1 <- rnorm(nobs,0,1)
+z2 <- rnorm(nobs,0,1)
+z3 <- rnorm(nobs,0,1)
+
+for(sample in 1:1500) {
+  #print(sample)
+  Sigma=matrix(c(1,r,r,1), nrow=2)
+  df = MASS::mvrnorm(nobs, mu=c(0,0), Sigma=Sigma, empirical=TRUE)
+  df <- as.data.frame(df)
+  colnames(df)[1] <- "u1"
+  colnames(df)[2] <- "u2"
+  
+  p<-a0+a1*z1+a2*z2+a3*z3+df$u1
+  q<-b0+b1*z1+b2*z2+b3*z3+df$u2
+
+  #5
+  reg<-lm(p~z1+z2+z3)
+  reg1<-lm(q~z1+z2+z3)
+
+  a0_hat_ols = reg$coefficients[1]
+  a1_hat_ols = reg$coefficients[2]
+  a2_hat_ols = reg$coefficients[3]
+  a3_hat_ols = reg$coefficients[4]
+  b0_hat_ols = reg1$coefficients[1]
+  b1_hat_ols = reg1$coefficients[2]
+  b2_hat_ols = reg1$coefficients[3]
+  b3_hat_ols = reg1$coefficients[4]
+
+  #6
+  price<- p~z1+z2+z3
+  quant<- q~z1+z2+z3
+  eqSystem <- list( p = price, q = quant)
+  sur <- systemfit(eqSystem, method="SUR")
+
+  a0_hat_sur = sur$coefficients[1]
+  a1_hat_sur = sur$coefficients[2]
+  a2_hat_sur = sur$coefficients[3]
+  a3_hat_sur = sur$coefficients[4]
+  b0_hat_sur = sur$coefficients[5]
+  b1_hat_sur = sur$coefficients[6]
+  b2_hat_sur = sur$coefficients[7]
+  b3_hat_sur = sur$coefficients[8]
+
+}
+#mean(a0_hat_ols)
+#mean(a1_hat_ols)
+#mean(a2_hat_ols)
+#mean(a3_hat_ols)
+#mean(b0_hat_ols)
+#mean(b1_hat_ols)
+#mean(b2_hat_ols)
+#mean(b3_hat_ols)
+
+(D1 = abs(mean(a0_hat_ols) - a0)+
+abs(mean(a1_hat_ols) - a1)+
+abs(mean(a2_hat_ols) - a2)+
+abs(mean(a3_hat_ols) - a3)+
+abs(mean(b0_hat_ols) - b0)+
+abs(mean(b1_hat_ols) - b1)+
+abs(mean(b2_hat_ols) - b2)+
+abs(mean(b3_hat_ols) - b3))
+
+#mean(a0_hat_sur)
+#mean(a1_hat_sur)
+#mean(a2_hat_sur)
+#mean(a3_hat_sur)
+#mean(b0_hat_sur)
+#mean(b1_hat_sur)
+#mean(b2_hat_sur)
+#mean(b3_hat_sur)
+
+(D2 = abs(mean(a0_hat_sur) - a0)+
+abs(mean(a1_hat_sur) - a1)+
+abs(mean(a2_hat_sur) - a2)+
+abs(mean(a3_hat_sur) - a3)+
+abs(mean(b0_hat_sur) - b0)+
+abs(mean(b1_hat_sur) - b1)+
+abs(mean(b2_hat_sur) - b2)+
+abs(mean(b3_hat_sur) - b3))
+
+```

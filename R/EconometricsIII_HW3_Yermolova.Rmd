@@ -1,0 +1,167 @@
+---
+title: 'HW3'
+output:
+  html_document:
+    df_print: paged
+---
+
+# Yermolova Daria
+
+```{r}
+library(MASS)
+library(wooldridge)
+library(stargazer)
+library(dplyr)
+library(corrplot)
+library(car)
+library(jtools)
+library(tidyverse)
+library(haven)
+library(lmtest)
+library(skedastic)
+library(sandwich)
+library(margins)
+library(robustbase)
+library(foreign)
+library(plm)
+library(ivreg)
+
+```
+```{r}
+#15.7
+#1
+#At the same level of income some students are more motivated than the others and thus they put more effort in their education, which means more motivated students might attend a choice school.
+#2
+#If the function form of faminc is correct, then as u1 does not include income, it would mean that random grant assignation is uncirrelated with students' abilities.
+#3
+#The reduced form: choice=pi0+pi1faminc+pi2grant+v2
+#This means that the grant amount affects choice, which is logical.
+#4 
+#score=alfa0+alfa1faminc+alfa2grant+v1
+#Which means we can estimate the influence of the grant size on the scores in tests.
+```
+16.1
+
+```{r}
+#1
+#If a1=0, y1=b1z1+u1
+#Which means there is only an exogenous variable in the regression. The reduced form is thus the same. The same situation is for the case a2=0, y1=b2z2+u2 is also the reduced form.
+#If a1 does not equal 0 and a2=9, y2=(b1/a1)z1-(b2/a1)z2+(u1-u2)/a1
+#1
+#y1-(a1/a2)y1=a1y2-a1y2+b1z1-(a1/a2)b2z2+u1-(a1/a2)u2=b1z1-(a1/a2)b2z2+u1-(a1/a2)u2
+#Since 1-a2a1 does not equal 0
+#y1=(a1y2-a1y2+b1z1-(a1/a2)b2z2+u1-(a1/a2)u2=b1z1-(a1/a2)b2z2+u1-(a1/a2)u2)/(1-a1a2)
+#For y2: y2=(b1z1-b2z2+u1-u2)/(a2-a1)
+#3
+#For the supply demand quantity example a1 does not equal a2, since we expect them to have a different sign.
+```
+
+15.2
+```{r}
+#1
+rm(list = ls())
+data('fertil2')
+dt<- fertil2
+```
+```{r}
+reg<- lm(children~educ+age+I(age^2), data=dt)
+summary(reg)
+#Each additional year of education, if age is fixed, leads to .091 fewer children. For a group of 100 women, if each had another of education, they would have n approx nine fewer children.
+```
+```{r}
+#2
+reg1<- lm(educ~frsthalf+age+I(age^2), data=dt)
+summary(reg1)
+#Since the coef of frsthalf is statistically different from zero we can use it as a reasonable 2SLS candidate. Women born in the first half of the year tend to have almost one year less education..
+```
+```{r}
+#3
+educ_hat <- reg1$fitted.values
+reg2 <- ivreg(children ~ educ_hat+age+I(age^2),data=dt)
+stargazer(reg1,reg2,type="text")
+#The estimated effect is not much larger
+```
+```{r}
+#4
+reg3<- lm(children~educ+electric+tv+bicycle+age+I(age^2), data=dt)
+reg4 <- ivreg(children ~ educ_hat+age+I(age^2)+electric+tv+bicycle,data=dt)
+stargazer(reg3,reg4,type="text")
+#The effect of TV has changed to being insignificant. The others are not much different.
+```
+16.6
+```{r}
+#1
+data(cement)
+
+reg1<- lm(gprc ~ gcem + gprcpet + feb + mar + apr + may + jun + jul + aug + sep + oct + nov + dec, data = cement)
+stargazer(reg1, type = 'text', digits = 4)
+
+#The supply function is sloped downward.
+#2
+reg2 <- lm(gcem ~ gdefs + gprcpet + feb + mar + apr + may + jun + jul + aug + sep + oct + nov + dec, data = cement)
+stargazer(reg2, type = 'text', digits = 4)
+lht(reg16.6.2, "gdefs=0")
+#3
+
+reg3<- lm(gcem ~ gres + gnon + gprcpet + feb + mar + apr + may + jun + jul + aug + sep + oct + nov + dec, data = cement)
+summary(reg3)
+
+#The coef on gnon in the reducen form is significant
+#4
+
+reg4 <- ivreg(gprc ~ gcem + gprcpet + feb + mar + apr + may + jun + jul + aug + sep + oct + nov + dec 
+                   | gres + gnon + gprcpet + feb + mar + apr + may + jun + jul + aug + sep + oct + nov + dec, 
+                   data = cement)
+stargazer(reg4, type = 'text', digits = 4)
+```
+16.2
+```{r}
+rm(list=ls())
+data("mroz")
+
+#1
+reg <- ivreg(log(hours) ~ lwage + educ + age + kidslt6 + nwifeinc |. - lwage + exper + expersq, data = mroz)
+summary(reg)
+
+#The labor supply elasticity is 1.99. This is even higher than waht we obtained from another equation.
+
+#2
+reg1 <- ivreg(log(hours) ~ lwage + educ + age + kidslt6 + nwifeinc |. - lwage + exper + expersq -educ +motheduc+fatheduc, data = mroz)
+summary(reg1)
+
+#We estimate the equation by 2SLS but treat log(wage) and educ as endogenous. 
+#The instrumental variables: age, kidslt6, nwifeinc, exper, exper , motheduc, and fatheduc.
+#Labor supply elasticity decreased
+
+
+#2
+#If we regress 2SLS residuals on the other factors:
+#The n-R-squared statistic is 0.428
+#p-value = 0.8
+#There is no evidence against the exogeneity of the IVs.
+```
+15.6
+```{r}
+data(murder)
+
+#1
+y <- filter(murder, year=="91"|year=="92"|year=="93" & exec>=1)
+unique(y$state)
+
+#16 states executed at least one prisoner
+#Texas had the most executions(34)
+
+#2
+reg <- plm(mrdrte~d93+exec+unem,data=subset(murder,year=="90"|year=="93"), model="pooling",index="id")
+summary(reg)
+
+# Statistically the coefficient on exec is not different from zero, so it does not imply an effect
+#3
+reg1 <- plm(mrdrte~exec+unem,data=subset(murder,year=="90"|year=="93"), model="fd",index="id")
+summary(reg1)
+
+#The coefficient on exec is now negative and statistically significant so there is a deterrent effect. 
+#The unemployment rate variable is now insignificant.
+
+```
+

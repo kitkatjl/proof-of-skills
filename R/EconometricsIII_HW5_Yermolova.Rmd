@@ -1,0 +1,268 @@
+---
+title: "HW5"
+output: html_document
+---
+
+Daria Yermolova
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r cars, echo = FALSE, include=FALSE}
+library(wooldridge)
+library(stargazer)
+library(dplyr)
+library(corrplot)
+library(car)
+library(jtools)
+library(tidyverse)
+library(fastDummies)
+library(recipes)
+library(lmtest)
+library(sandwich)
+library(skedastic)
+library(mfx)
+library(sampleSelection)
+library(stargazer)
+library(mfx)
+library(censReg)
+library(truncreg)
+library(survival)
+```
+
+
+
+```{r}
+# Problem C17.1
+# 1
+rm(list = ls())
+data(pntsprd)
+df <- pntsprd
+```
+#If spread is equal to zero, then there is no favorite. The probability of the team we pick being the favorite should be 50%.
+
+
+```{r}
+#2
+reg <- lm(data = pntsprd, favwin ~ spread)
+#stargazer(reg, type="text", digits=4)
+linearHypothesis(reg, c("(Intercept)=0.5"))
+linearHypothesis(reg, c("(Intercept)=0.5"), vcov = vcovHC(reg, "HC1"))
+```
+#We reject H0 against the alternatives in both of the cases.
+
+```{r}
+#3
+0.577 + .0194 * 10
+```
+#Spread is statistically significant.
+#If spread is equal to 10, probability that the favored team wins is abot 77,1%.
+
+
+```{r}
+#4
+probit<-glm(favwin ~ spread, family=binomial(link=probit), data=pntsprd)
+summary(probit)
+```
+#We can not reject H0.
+
+```{r}
+#5
+xpred <- list(spread=c(10))
+predict(probitres, xpred, type = "response")
+```
+#It is slightly above the estimate that  the LPM gave.
+
+```{r}
+#6
+probit1<-glm(favwin ~ spread + favhome + fav25 +und25, family=binomial(link=probit), data=pntsprd)
+stargazer(type="text", probit1)
+```
+#The value of the log- likelihood is 262.64.
+#The likelihood ratio statistic is equa,l to 2(263.56 – 262.64) = 1.84.
+#The p-value is about 61%
+#Thus, favhome, fav25, and und25 are jointly insignificant. 
+#If spread is controlled for, th other factors have no additional power for predicting the outcome.
+
+```{r}
+# Problem C17.3
+#1
+rm(list = ls())
+a = count(fringe %>% filter(pension == 0))
+a/count(fringe)
+
+fringe %>% filter(pension > 0) %>% summarise(min=min(pension), max = max(pension))
+
+```
+#27.9%
+#from 7.28$ to 2,880.27$
+#There is a nontrivial fraction of the sample with pensiont = 0. The range of positive pension benefits is wide. Thus, Tobit model is appropriate.
+
+```{r}
+#2
+Tobit<- censReg(pension ~ exper + age + tenure + educ + depends + married + white + male, data=fringe)
+summary(Tobit)
+```
+#White or male people tned to have increased predicted pension benefits, although only the coef on male is statistically significant.
+
+```{r}
+#3
+-1252.5 + 5.20*10 - 4.64*35 + 36.02*10 + 93.21*16 + 144.09 + 308.15
+```
+#E(pension|x) = 966.40.
+```{r}
+-1252.5 + 5.20*10 - 4.64*35 + 36.02*10 + 93.21*16
+```
+#E(pension|x) = 582.10
+
+#The difference between a white male person's pension and a nonwhite female person's pension is 966.40 – 582.10 = $384.30
+
+
+```{r}
+Tobit2<- censReg(pension ~ exper + age + tenure + educ + depends + married + white + male + union, data=fringe)
+stargazer(Tobit, Tobit2, type="text")
+```
+#The t statistic on union is over seven, so the coef is statistically significant and large in value.
+
+```{r}
+#4
+Tobit3<- censReg(pension ~ exper + age + tenure + educ + depends + married + white + male + union + peratio, data=fringe)
+stargazer(Tobit, Tobit2, Tobit3, type="text")
+linearHypothesis(Tobit3, "white + male = 0")
+#In this case the coefs on white and male are individually insignificant.
+#Neither whites nor males tend to have different tastes for pension benefits as a fraction of earnings, since the p-value of the test is low.
+#White males tend to have higher pension benefits due to their higher earnings.
+```
+
+```{r}
+#Problem 17.7
+#1
+reg = lm(data = mroz, log(wage) ~ exper + I(exper^2) + nwifeinc + age + kidslt6 + kidsge6 + educ)
+stargazer(reg, type = "text")
+```
+#The coef of education is 0.01 and standard error is 0.015
+
+```{r}
+#2
+reg = heckit(data = mroz, log(wage) ~ exper + I(exper^2) + nwifeinc + age + kidslt6 + kidsge6 + educ, )
+stargazer(reg, type = "text")
+```
+#The Heckit coef on education is 0.1187. Return to education is now larger than in the previous version, but the Heckit standard error is more than twice as large.
+
+#3
+#R^2=.962
+#Thus,there is major multicollinearity among the explanatory variables in the second stage regression.
+#Which is the reason of the large standard errors.
+
+```{r}
+#Problem 17.8
+#1
+rm(list = ls())
+df <- jtrain2
+count(jtrain2)
+count(jtrain2 %>% filter(train == 1))
+
+jtrain2 %>% filter(train == 1) %>% summarise(max = max(mosinex))
+```
+#185 out of 445 people participated in the job training program
+#The longest time of the experiment was 24 months
+```{r}
+#2
+reg = lm(data = jtrain2, train ~ unem74 + unem75 + age + educ + black + hisp + married)
+stargazer(reg, type = "text")
+```
+#p-value = 0.19
+#Thus, the variables are jointly insignificant.
+```{r}
+#3
+probit<-glm(data = jtrain2, train ~ unem74 + unem75 + age + educ + black + hisp + married, family=binomial(link=probit))
+summary(probit)
+logLik(probit) 
+```
+#p-value = 0.18
+#Close to that obtained for the LPM.
+ 
+#4
+#Since training eligibility was randomly assigned, it is not surprising that train appears to be independent of other observed factors
+
+#5
+```{r}
+reg<-lm(data = jtrain2, unem78 ~ train)
+summary(reg)
+```
+#Participating in the job training program tends to lower the estimated probability of being unemployed in 1978 by 11.1 percentage points. 
+#The differences are statistically significant.
+
+#6
+```{r}
+probit-glm(data = jtrain2, unem78 ~ train, family=binomial(link=probit))
+summary(probit)
+```
+#The probabilities have different functional forms, so we should not compare them.
+
+#7
+#The fitted values in each case reamin the same: 0.354 when train = 0 and 0.243 when train = 1.
+#LPM estimates are usually easier to interprete.
+
+
+```{r}
+#8
+reg1= lm(unem78~train+unem74+unem75+age+educ+black+hisp+married, data = jtrain2)
+reg2 = glm(unem78~train+unem74+unem75+age+educ+black+hisp+married, family = binomial(link=probit),data = jtrain2)
+predict(reg1, type = "response")
+predict(reg2, type = "response")
+stargazer(reg1, reg2, type = "text")
+fit1 = fitted(reg1)
+fit12 = fitted(reg2)
+print(cor(fit1, fit1, method = "pearson"))
+```
+#They are not identical now, although correlation is very high - 0.993
+
+
+```{r}
+#9
+pred= predict(reg2)
+factor = mean(dnorm(pred))
+ape = coef(reg2)*factor
+cbind(ape)
+
+```
+The value is -0.113б which is close to OLS estimator
+
+
+
+```{r}
+# Problem C17.13
+
+#1
+reg = lm(data = htv, log(wage) ~ educ + abil + exper + nc + west + south + urban)
+stargazer(reg, type = "text")
+```
+#Using the whole sample, the estimated coef on education is 0.104 with standard error = 0.0097
+
+
+```{r}
+#2
+reg2 = lm(data = filter(htv, educ < 16), log(wage) ~ educ + abil + exper + nc + west + south + urban)
+stargazer(reg, reg2, type = "text")
+```
+#166 observations are missing (about 13.5% of the original sample)
+#The coefficient on educ becomes 0.118 with standard error 0.0126.
+
+
+```{r}
+#3
+reg = lm(data = filter(htv, wage < 20), log(wage) ~ educ + abil + exper + nc + west + south + urban)
+stargazer(reg, type = "text")
+```
+#164 observations are lost.
+#But now the value of the coefficient on educ is much smaller, 0.0579, with standard error = 0.0093
+
+```{r}
+#4
+reg = truncreg(data = filter(htv, wage < 20), log(wage) ~ educ + abil + exper + nc + west + south + urban, right = log(20))
+summary(reg)
+```
+#the coef on education is 0.1060, standard error = 0.0168
+#It is very close to the estimate on the original sample, but we obtain a less precise estimation.

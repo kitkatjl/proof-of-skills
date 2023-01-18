@@ -1,0 +1,179 @@
+---
+title: "Team_9"
+output: word_document
+---
+
+
+```{r }
+#PART A
+library(dplyr)
+library(survival)
+library(SurvRegCensCov) 
+load('FarmsUA.Rdata')
+ndt$id_ <- ndt$year*100000+ndt$ID
+ndt <- ndt[!duplicated(ndt$id),]
+
+ndt <- ndt[order(ndt$year),]
+ndt <- ndt[order(ndt$ID),]
+
+
+qwe <- c()
+for (i in 1:nrow(ndt)) {
+  qwe <- c(qwe, ifelse(ndt$ID[i+1] == ndt$ID[i] | ndt$year[i] == 2014, 0, 1))
+}
+ndt$exit <- qwe
+
+ndt1 <- as.data.frame(unique(ndt$ID))
+colnames(ndt1) <- "id"
+
+exit <- c()
+for (i in 1:nrow(ndt1)) {
+  farm_exits <- ndt$exit[ndt$ID == ndt1$id[i]]
+  exit_sum <- sum(farm_exits)
+  exit_id <- ifelse(exit_sum == 0, 0, 1)
+  exit <- c(exit, exit_id)
+}
+ndt1$exit <- exit
+
+#names(ndt)
+ndt$livestosk_profit <- ndt$livest_revenue-ndt$totcost_livest
+ndt$crop_profit <- ndt$crop_revenue-ndt$totcost_crop
+ndt$laborcost <- ndt$laborcost_crop+ndt$laborcost_livest
+
+for (i in 1:nrow(ndt1)) {
+  id <- ndt1$id[i]
+  years <- ndt$year[ ndt$ID == id]
+  year <- ifelse(ndt1$exit[i] == 0, 2014, max(years))
+  survival_time <- max(years) - min(years) + 1
+  ndt1[i, "laborcost"] <- ndt[ndt$year == year & ndt$ID == id, "laborcost"]
+  ndt1[i, "survival_time"] <- survival_time
+  ndt1[i, "livestosk_profit"] <- ndt[ndt$year == year & ndt$ID == id, "livestosk_profit"]
+  ndt1[i, "crop_profit"] <- ndt[ndt$year == year & ndt$ID == id, "crop_profit"]
+  ndt1[i, "rent_land"] <- ndt[ndt$year == year & ndt$ID == id, "rent_land"]
+  
+}
+
+mod_logit<-glm(exit~laborcost+rent_land+crop_profit+livestosk_profit,
+            family=binomial(link=logit),data=ndt1)
+summary(mod_logit)
+
+#Additionaly
+# Calculation of linear index at individual values:
+xb.log <- predict(mod_logit)
+
+# APE factors = average(g(xb))
+factor.log <- mean( dlogis(xb.log) ) # logit pdf
+
+# average partial effects = beta*factor:
+APE.log <- coef(mod_logit) * factor.log
+```
+```{r}
+#PART B
+#Factor 1- laborcost
+variables <- c("laborcost")
+for (i in 1:nrow(ndt1)) {
+  id <- ndt1$id[i]
+  years <- ndt$year[ ndt$ID == id]
+  year <- ifelse(ndt1$exit[i] == 0, 2014, max(years))
+  survival_time <- max(years) - min(years) + 1
+  variable_vector <- ndt[ndt$year == year & ndt$ID == id, variables]
+  ndt1[i, variables] <- variable_vector
+  ndt1[i, "survival_time"] <- survival_time
+}
+time <- ndt1$survival_time
+event <- ndt1$exit
+X <- ndt1[, variables]
+
+# Cox proportional hazard model - coefficients and hazard rates
+coxph <- coxph(Surv(time,event) ~ X, method="breslow")
+summary(coxph)
+
+```
+```{r}
+#Factor 2- rent_land
+variables <- c("rent_land")
+for (i in 1:nrow(ndt1)) {
+  id <- ndt1$id[i]
+  years <- ndt$year[ ndt$ID == id]
+  year <- ifelse(ndt1$exit[i] == 0, 2014, max(years))
+  survival_time <- max(years) - min(years) + 1
+  variable_vector <- ndt[ndt$year == year & ndt$ID == id, variables]
+  ndt1[i, variables] <- variable_vector
+  ndt1[i, "survival_time"] <- survival_time
+}
+time <- ndt1$survival_time
+event <- ndt1$exit
+X <- ndt1[, variables]
+
+# Cox proportional hazard model - coefficients and hazard rates
+coxph <- coxph(Surv(time,event) ~ X, method="breslow")
+summary(coxph)
+```
+```{r}
+#Factor 3- livestock_profit
+variables <- c("livestosk_profit")
+for (i in 1:nrow(ndt1)) {
+  id <- ndt1$id[i]
+  years <- ndt$year[ ndt$ID == id]
+  year <- ifelse(ndt1$exit[i] == 0, 2014, max(years))
+  survival_time <- max(years) - min(years) + 1
+  variable_vector <- ndt[ndt$year == year & ndt$ID == id, variables]
+  ndt1[i, variables] <- variable_vector
+  ndt1[i, "survival_time"] <- survival_time
+}
+time <- ndt1$survival_time
+event <- ndt1$exit
+X <- ndt1[, variables]
+
+# Cox proportional hazard model - coefficients and hazard rates
+coxph <- coxph(Surv(time,event) ~ X, method="breslow")
+summary(coxph)
+
+```
+```{r}
+#Factor 4- crop_revenue
+variables <- c("crop_revenue")
+for (i in 1:nrow(ndt1)) {
+  id <- ndt1$id[i]
+  years <- ndt$year[ ndt$ID == id]
+  year <- ifelse(ndt1$exit[i] == 0, 2014, max(years))
+  survival_time <- max(years) - min(years) + 1
+  variable_vector <- ndt[ndt$year == year & ndt$ID == id, variables]
+  ndt1[i, variables] <- variable_vector
+  ndt1[i, "survival_time"] <- survival_time
+}
+time <- ndt1$survival_time
+event <- ndt1$exit
+X <- ndt1[, variables]
+
+# Cox proportional hazard model - coefficients and hazard rates
+coxph <- coxph(Surv(time,event) ~ X, method="breslow")
+summary(coxph)
+
+```
+```{r}
+#Factor 5- depreciation_crop
+variables <- c("depreciation_crop")
+for (i in 1:nrow(ndt1)) {
+  id <- ndt1$id[i]
+  years <- ndt$year[ ndt$ID == id]
+  year <- ifelse(ndt1$exit[i] == 0, 2014, max(years))
+  survival_time <- max(years) - min(years) + 1
+  variable_vector <- ndt[ndt$year == year & ndt$ID == id, variables]
+  ndt1[i, variables] <- variable_vector
+  ndt1[i, "survival_time"] <- survival_time
+}
+time <- ndt1$survival_time
+event <- ndt1$exit
+X <- ndt1[, variables]
+
+# Cox proportional hazard model - coefficients and hazard rates
+coxph <- coxph(Surv(time,event) ~ X, method="breslow")
+summary(coxph)
+
+```
+
+
+
+
+

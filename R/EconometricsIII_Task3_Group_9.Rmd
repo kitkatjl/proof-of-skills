@@ -1,0 +1,303 @@
+---
+title: 'TA_3 output: word_document'
+output: word_document
+---
+
+# Part 1
+
+```{r }
+#2
+library(foreign)
+library(stargazer)
+library(sandwich)
+library(car)
+dat<-read.dta("Bell.dta")
+
+#4
+dat$titled[is.na(dat$titled)]<-0
+dat$owned_titled <- dat$owned == 1 & dat$titled == 1
+dat$owned_titled[ is.na( dat$titled ) ] <- 0
+dat$sell[ is.na( dat$sell ) ] <- 0
+dat$tomb[ is.na( dat$tomb ) ] <- 0
+dat$lease_out[ is.na( dat$lease_out ) ] <- 0
+dat$trees[ is.na( dat$trees ) ] <- 0
+dat$kids[ is.na( dat$kids )] <- 0
+dat$purchased <- dat$mode_owned == 1
+dat$purchased[ is.na( dat$mode_owned ) ] <- 0
+dat$inherited <- dat$mode_owned == 2
+dat$inherited[ is.na( dat$mode_owned ) ] <- 0
+dat$gift <- dat$mode_owned == 3
+dat$gift[ is.na( dat$mode_owned ) ] <- 0
+dat$exploit <- dat$mode_owned == 4
+dat$exploit[ is.na( dat$mode_owned ) ] <- 0
+dat$ln_area <- log( dat$area + 0.001 )
+dat$ln_yield <- log( dat$yield + 0.001 )
+datFull <- dat # keep the full / original data set
+dat <- dat[ dat$owned == 1 & dat$yield > 0, ]
+
+#5
+nrow( dat )
+
+table1<-round( t( sapply(dat[,c("yield","area","chat","nhat","phhat","pothat","clayhat", "silthat","sandhat","disease","dist_house","color_bl","color_rd","color_brwh","loc_lowland","loc_summit","loc_side","rain","dam","spring","sell","tomb","lease_out","trees","kids","inherited","purchased","gift","exploit","owned_titled")],function(x) c( mean(x), sd(x) ))),3)
+
+rownames(table1) <- c('Yielld(kg/car)', 'Cultivated area (area)','Carbon (percent)','Nitrogen(percent)', 'Soil pH', 'Potassium (percent)', 'Clay (percent)', 'Silt (percent)', 'Sand (percent)', 'Crop disease dummy',  'Distance from house (walking minutes)', 'Black Soil dummy', 'Red Soil dummy', 'Brown or white soil dummy', 'Lowland plot dummy', 'Hilltop plot dummy', 'Hillside plot dummy', 'Irrigated by rain dummy', 'Irrigated by dam dummy', 'Irrigated by spring dummy',"Right to sell dummy", " Right to build a tomb dummy",  "Right to lease out dummy", " Right to plant trees dummy", "Kids will have the same rights dummy",  "Inherited plot dummy", "Purchased plot dummy", " Plot received as gift dummy", " Plot obtained through clearing dummy", "Formal title dummy")
+colnames(table1) <- c('Coef.','Std.Dev.')
+
+stargazer(table1,type="text")
+
+dt1 <- dat[dat$owned_titled==1,]
+dt2 <- dat[dat$owned_titled==0,]
+
+table2_titl<-round( t( sapply(dt1[,c("sell","kids","tomb","lease_out","trees","inherited","purchased", "gift", "exploit", "chat","nhat","phhat","pothat","clayhat", "silthat","sandhat","yield")],function(x) c(mean(x), sd(x)))), 3)
+
+table2_untitl <- round( t( sapply(dt2[,c("sell","kids","tomb","lease_out","trees","inherited","purchased", "gift", "exploit", "chat","nhat","phhat","pothat","clayhat", "silthat","sandhat","yield")],function(x) c(mean(x), sd(x)))),3)
+ table2 <- cbind(table2_untitl,table2_titl)
+ 
+rownames(table2) <- c('Right to sell dummy', ' Children will have same rights dummy',' Right to build a tomb dummy',' Right to lease out dummy', ' Right to plant trees dummy', ' Inherited plot dummy', ' Purchased plot dummy', ' Plot received as gift dummy', ' Plot obtained through clearing dummy', ' Carbon (percent)',  ' Nitrogen (percent)', ' Soil pH', ' Potassium (percent)', ' Clay (percent)', ' Silt (percent)', ' Sand (percent)', ' Rice Yield')
+colnames(table2) <- c('Mean','Std.Dev.','Mean','Std.Dev.')
+stargazer(table2, type= "text")
+
+
+#6_OLS
+mod_ols <- lm((ln_yield)~owned_titled+sell+lease_out+kids+trees+tomb+ln_area+disease+dist_house+color_rd+color_brwh+loc_summit+loc_side+dam+spring+ln_c+ln_n+ln_ph+ln_pot+ln_clay+ln_silt+ln_sand,data=dat)
+summary(mod_ols, digits = 3)
+
+#7_IV
+library(AER)
+dat$dummy <- ifelse(dat$inherited == 1 | dat$gift == 1, 1, 0)
+mod1 <- lm(owned_titled~sell+lease_out+kids+trees+tomb+ln_area+disease+dist_house+color_rd+color_brwh+loc_summit+loc_side+dam+spring+ln_c+ln_n+ln_ph+ln_pot+ln_clay+ln_silt+ln_sand+dummy, data = dat)
+owned_titledhat <- mod1$fitted.values
+
+mod_2sls <- lm(ln_yield ~ owned_titledhat+sell+lease_out+kids+trees+tomb+ln_area+disease+dist_house+color_rd+color_brwh+loc_summit+loc_side+dam+spring+ln_c+ln_n+ln_ph+ln_pot+ln_clay+ln_silt+ln_sand, data = dat)
+summary(mod_2sls)
+
+#8_plm
+library(plm)
+mod_fe <- plm(ln_yield ~ owned_titled+sell +lease_out+kids+trees+tomb+ln_area+disease+dist_house+color_rd+color_brwh+loc_summit +loc_side+dam +spring +ln_c +ln_n +ln_ph+ ln_pot +ln_clay +ln_silt +ln_sand,index='hhid', cluster='village', model='within', data=dat)
+summary(mod_fe)
+
+#9_FE_IV
+mod_fe_iv <- plm(ln_yield ~ owned_titled+sell+lease_out+kids+trees+tomb+ln_area+disease+dist_house+color_rd+color_brwh+loc_summit+loc_side+dam+spring+ln_c+ln_n+ln_ph+ln_pot+ln_clay+ln_silt+ln_sand|.-owned_titled+dummy, index="hhid", cluster="village", model = "within", data = dat)
+summary(mod_fe_iv)
+stargazer(mod_ols,mod_2sls,mod_fe,mod_fe_iv, type="text")
+
+#11
+coeftest(mod_ols, vcovHC(mod_ols, vcov.args = list(cluster = village)))
+coeftest(mod_2sls, vcovHC(mod_2sls,  vcov.args = list(cluster = village)))
+coeftest(mod_fe, vcovHC(mod_fe,  vcov.args = list(cluster = village)))
+coeftest(mod_fe_iv, vcovHC(mod_fe_iv,  vcov.args = list(cluster = village)))
+
+#12
+cor(owned_titledhat, dat$owned_titled)
+
+#13
+lht(mod_ols, c("ln_c", "ln_n", "ln_ph", "ln_pot", "ln_clay", "ln_silt", "ln_sand"), c(0,0,0,0,0,0,0))
+
+lht(mod_ols, c("ln_c", "ln_n", "ln_ph", "ln_pot", "ln_clay", "ln_silt", "ln_sand"), c(0,0,0,0,0,0,0), vcov. = vcovHC(mod_ols, method = "arellano", type = "HC3"))
+
+
+lht(mod_2sls, c("ln_c", "ln_n", "ln_ph", "ln_pot", "ln_clay", "ln_silt", "ln_sand"), c(0,0,0,0,0,0,0))
+
+lht(mod_2sls, c("ln_c", "ln_n", "ln_ph", "ln_pot", "ln_clay", "ln_silt", "ln_sand"), c(0,0,0,0,0,0,0), vcov. = vcovHC(mod_2sls, method = "arellano", type = "HC3"))
+
+lht(mod_fe, c("ln_c", "ln_n", "ln_ph", "ln_pot", "ln_clay", "ln_silt", "ln_sand"), c(0,0,0,0,0,0,0))
+
+lht(mod_fe, c("ln_c", "ln_n", "ln_ph", "ln_pot", "ln_clay", "ln_silt", "ln_sand"), c(0,0,0,0,0,0,0), vcov. = vcovHC(mod_fe, method = "arellano", type = "HC3"))
+
+lht(mod_fe_iv, c("ln_c", "ln_n", "ln_ph", "ln_pot", "ln_clay", "ln_silt", "ln_sand"), c(0,0,0,0,0,0,0))
+
+lht(mod_fe_iv, c("ln_c", "ln_n", "ln_ph", "ln_pot", "ln_clay", "ln_silt", "ln_sand"), c(0,0,0,0,0,0,0), vcov. = vcovHC(mod_fe_iv, method = "arellano", type = "HC3"))
+```
+
+
+# Part 2
+
+```{r, echo=FALSE}
+library(wooldridge)
+library(stargazer)
+library(dplyr)
+library(corrplot)
+library(car)
+library(jtools)
+library(tidyverse)
+library(haven)
+library(lmtest)
+library(skedastic)
+library(sandwich)
+library(margins)
+library(robustbase)
+library(ivreg)
+```
+
+
+```{r, echo=TRUE}
+#1
+rm(list=ls())
+set.seed(123)
+nobs<-1000
+a0<-10
+a1<-12
+a2<-11
+a3<-9
+b0<-13
+b1<-14
+b2<-15
+```
+```{r echo=TRUE}
+#2
+z1 <- rnorm(nobs,0,1)
+z2 <- rnorm(nobs,0,1)
+z3 <- rnorm(nobs,0,1)
+hist(z1)
+```
+```{r echo=TRUE}
+#3
+r = 0.5
+Sigma=matrix(c(1,r,r,1), nrow=2)
+df = MASS::mvrnorm(nobs, mu=c(0,0), Sigma=Sigma, empirical=TRUE)
+df <- as.data.frame(df)
+colnames(df)[1] <- "u1"
+colnames(df)[2] <- "u2"
+var(df["u1"]) 
+var(df["u2"]) 
+cov(df["u1"], df["u2"]) 
+```
+
+```{r}
+#4
+p<-(a0+a1*b0+a1*b2*z3+a1*df$u2+a2*z1+a3*z2+df$u1)/(1-a1*b1)
+q<-(b0+b1*p+b2*z3+df$u2)
+```
+```{r}
+#5
+reg<-lm(p~ q+z1+z2)
+reg1<-lm(q~ p+z3)
+stargazer(reg, reg1, type = "text")
+```
+```{r}
+#6
+reg2 <- ivreg(p ~ q + z1 + z2 | z1 + z2 + z3)
+reg3 <- ivreg(q ~ p + z3 | z1 + z2 + z3)
+stargazer(reg2, reg3, type = "text")
+```
+```{r}
+#7
+q1_hat_2sls = NULL
+z1_hat_2sls = NULL
+z2_hat_2sls = NULL
+z3_hat_2sls = NULL
+p_hat_2sls = NULL
+q1_hat_ols = NULL
+z1_hat_ols = NULL
+z2_hat_ols = NULL
+z3_hat_ols = NULL
+p_hat_ols = NULL
+for(sample in 1:1500) {
+  #print(sample)
+  r = 0.5
+  Sigma=matrix(c(1,r,r,1), nrow=2)
+  df = MASS::mvrnorm(nobs, mu=c(0,0), Sigma=Sigma, empirical=TRUE)
+  df <- as.data.frame(df)
+  colnames(df)[1] <- "u1"
+  colnames(df)[2] <- "u2"
+  
+  #4
+  p<-(a0+a1*b0+a1*b2*z3+a1*df$u2+a2*z1+a3*z2+df$u1)/(1-a1*b1)
+  q<-(b0+b1*p+b2*z3+df$u2)
+  
+  #5
+  reg<-lm(p~ q+z1+z2)
+  reg1<-lm(q~ p+z3)
+
+  q1_hat_ols = reg$coefficients[2]
+  z1_hat_ols = reg$coefficients[3]
+  z2_hat_ols = reg$coefficients[4]
+  z3_hat_ols = reg1$coefficients[3]
+  p_hat_ols = reg1$coefficients[2]
+  
+  #6
+  reg2 <- ivreg(p ~ q + z1 + z2 | z1 + z2 + z3)
+  reg3 <- ivreg(q ~ p + z3 | z1 + z2 + z3)
+  q1_hat_2sls = reg2$coefficients[2]
+  z1_hat_2sls = reg2$coefficients[3]
+  z2_hat_2sls = reg2$coefficients[4]
+  z3_hat_2sls = reg3$coefficients[3]
+  p_hat_2sls = reg3$coefficients[2]
+}
+mean(q1_hat_2sls)
+mean(z1_hat_2sls)
+mean(z2_hat_2sls)
+mean(z3_hat_2sls)
+mean(p_hat_2sls)
+
+mean(q1_hat_ols)
+mean(z1_hat_ols)
+mean(z2_hat_ols)
+mean(z3_hat_ols)
+mean(p_hat_ols)
+```
+
+```{r}
+#8
+nobs = 500
+#nobs = 5000
+
+#r = 0.5
+r = -0.5
+#r = 0
+z1 <- rnorm(nobs,0,1)
+z2 <- rnorm(nobs,0,1)
+z3 <- rnorm(nobs,0,1)
+q1_hat_2sls = NULL
+z1_hat_2sls = NULL
+z2_hat_2sls = NULL
+z3_hat_2sls = NULL
+p_hat_2sls = NULL
+q1_hat_ols = NULL
+z1_hat_ols = NULL
+z2_hat_ols = NULL
+z3_hat_ols = NULL
+p_hat_ols = NULL
+for(sample in 1:1500) {
+  #print(sample)
+  Sigma=matrix(c(1,r,r,1), nrow=2)
+  df = MASS::mvrnorm(nobs, mu=c(0,0), Sigma=Sigma, empirical=TRUE)
+  df <- as.data.frame(df)
+  colnames(df)[1] <- "u1"
+  colnames(df)[2] <- "u2"
+  
+  #4
+  p<-(a0+a1*b0+a1*b2*z3+a1*df$u2+a2*z1+a3*z2+df$u1)/(1-a1*b1)
+  q<-(b0+b1*p+b2*z3+df$u2)
+  
+  #5
+  reg<-lm(p~ q+z1+z2)
+  reg1<-lm(q~ p+z3)
+
+  q1_hat_ols = reg$coefficients[2]
+  z1_hat_ols = reg$coefficients[3]
+  z2_hat_ols = reg$coefficients[4]
+  z3_hat_ols = reg1$coefficients[3]
+  p_hat_ols = reg1$coefficients[2]
+  
+  #6
+  reg2 <- ivreg(p ~ q + z1 + z2 | z1 + z2 + z3)
+  reg3 <- ivreg(q ~ p + z3 | z1 + z2 + z3)
+  q1_hat_2sls = reg2$coefficients[2]
+  z1_hat_2sls = reg2$coefficients[3]
+  z2_hat_2sls = reg2$coefficients[4]
+  z3_hat_2sls = reg3$coefficients[3]
+  p_hat_2sls = reg3$coefficients[2]
+}
+mean(q1_hat_2sls)
+#mean(z1_hat_2sls)
+#mean(z2_hat_2sls)
+#mean(z3_hat_2sls)
+#mean(p_hat_2sls)
+
+#mean(q1_hat_ols)
+#mean(z1_hat_ols)
+#mean(z2_hat_ols)
+#mean(z3_hat_ols)
+#mean(p_hat_ols)
+```
