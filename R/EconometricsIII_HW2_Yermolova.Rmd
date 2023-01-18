@@ -1,0 +1,159 @@
+---
+title: 'HW1'
+output:
+  html_document:
+    df_print: paged
+---
+
+# Yermolova Daria
+
+```{r}
+library(MASS)
+library(wooldridge)
+library(stargazer)
+library(dplyr)
+library(corrplot)
+library(car)
+library(jtools)
+library(tidyverse)
+library(haven)
+library(lmtest)
+library(skedastic)
+library(sandwich)
+library(margins)
+library(robustbase)
+library(foreign)
+library(plm)
+
+```
+13.1
+```{r}
+rm(list = ls())
+data('fertil1')
+dt<- fertil1
+```
+```{r}
+reg<- lm(kids~educ+age+I(age^2)+black+east+northcen+west+farm+othrural+town+smcity+y74+y76+y78+y80+y82+y84, data=dt)
+summary(reg)
+```
+```{r}
+lht(reg,"othrural+farm + town+smcity", 0)
+#P-value is 0.85, so the living conditions variables are jointly insignificant
+```
+
+```{r}
+lht(reg,"east+northcen+west", 0)
+#P-value is 0.018, so the region is statistically significant
+```
+```{r}
+dt$u<-residuals(reg)
+dt$u2<-(dt$u)^2
+reg2<- lm(u2~y74+y76+y78+y80+y82+y84, data=dt)
+summary(reg2)
+#p-value is 0.008, thus the years variables are jointly significant, thus, the heteroscedasticity is present in the model
+```
+```{r}
+reg3<- lm(kids~educ+age+I(age^2)+black+east+northcen+west+farm+othrural+town+smcity+y74+y76+y78+y80+y82+y84+I(y74*educ)+I(y76*educ)+I(y78*educ)+I(y80*educ)+I(y82*educ)+I(y84*educ), data=dt)
+summary(reg3)
+#The R^2 has not changed significantly. y78, y82, y84 interaction terms are statistically significant. The interaction terms show how the effect of education differs over years. The coef show that the effect is growing over time. 
+```
+13_5
+```{r}
+#1
+rm(list = ls())
+data('rental')
+reg1 <- plm(log(rent) ~ y90 + log(pop) + log(avginc) + pctstu, data = rental, model = "pooling")
+stargazer(reg1, type="text")
+#y90 coef says that the nominal rents grew by 26%, the coef of pctstu says that a one percentage point increase in pctstu increases rent by about 0.5%.
+```
+```{r}
+#2
+#The standard errors from the 1st question are invalid, unless ai is absent in the equation.
+#The errors of 2 periods are positively correlated, if ai is present.
+```
+```{r}
+#3
+reg2<-plm(log(rent)~y90+log(pop)+log(avginc)+pctstu, data = rental, model = "fd")
+summary(reg2)
+stargazer(reg1, reg2, type='text')
+#the effect of pctstu is more than 2 times larger than the one we estimated in the pooled OLS.
+#A one percentage increase in pctstu is estimated to increase rentals by about 1.1%.
+```
+```{r}
+#4
+reg3<-rlm(log(rent) ~ y90+log(pop)+log(avginc)+pctstu, data= rental)
+stargazer(reg3, reg2, type='text', digits = 5)
+#the heteroskedasticity-robust stand error (e) on pctstu is approx 0.0028, which is smaller than the usual OLS's one. The new t-statistic is 4.
+```
+
+13_13
+```{r}
+rm(list = ls())
+data('wagepan')
+dt<- wagepan
+mod1<-lm(lwage~d81+d82+d83+d84+d85+d86+d87+educ+I(educ*d81)+I(educ*d82)+I(educ*d83)+I(educ*d84)+I(educ*d85)+I(educ*d86)+I(educ*d87)+union,data=dt)
+```
+```{r}
+#2
+#p-value is 0,9518, thus, we can not reject H0 (the educ effect is constant over time).
+mod2<-plm(lwage~d81+d82+d83+d84+d85+d86+d87+educ+I(educ*d81)+I(educ*d82)+I(educ*d83)+I(educ*d84)+I(educ*d85)+I(educ*d86)+I(educ*d87)+union,data=dt, model="fd")
+summary(mod2)
+lht(mod2, c("I(educ * d81)", "I(educ * d82)","I(educ * d83)", "I(educ * d84)","I(educ * d85)", "I(educ * d86)","I(educ * d87)"))
+```
+```{r}
+#3
+coeftest(mod2, vcov = pvcovHC)
+waldtest(mod2, c("I(educ * d81)", "I(educ * d82)","I(educ * d83)", "I(educ * d84)","I(educ * d85)", "I(educ * d86)","I(educ * d87)"), pvcov=vcovHC(mod2,"white1"))
+```
+```{r}
+#4
+#the estimated union effect is approximately 10,6% . In 1987 is -14,7%. They are both statistically significant.
+mod3<-plm(lwage~d81+d82+d83+d84+d85+d86+d87+educ+I(educ*d81)+I(educ*d82)+I(educ*d83)+I(educ*d84)+I(educ*d85)+I(educ*d86)+I(educ*d87)+union+I(union*d81)+I(union*d82)+I(union*d83)+I(union*d84)+I(union*d85)+I(union*d86)+I(union*d87),data=dt, model="fd")
+summary(mod3)
+```
+```{r}
+#5
+#p-value is 0.405, so we can not reject h0 that the union differential has remained constant. They are jointly insignificant. There is very big difference between the first and the last year.
+lht(mod3, c("I(union * d81)", "I(union * d82)","I(union * d83)", "I(union * d84)","I(union * d85)", "I(union * d86)","I(union * d87)"))
+```
+13_3 
+There are no repeated observations in the cross-sectional analysis,  since the data only covers one year. So we can not look at the difference between them. New samples are obtained each year when the data is collected and it is rare that the same individual case exists in both. 
+14_13
+```{r}
+data('driving')
+df<-driving
+#1
+df %>% filter(year==1980) %>% summarise(mean=mean(totfatrte))
+df %>% filter(year==1992) %>% summarise(mean=mean(totfatrte))
+df %>% filter(year==2004) %>% summarise(mean=mean(totfatrte))
+#The mean of totfatrte  in 1980 - 25.5, in 1992 - 17.16, in 2004 - 16.73;
+#The number of total fatalities decreased with time;
+reg1<-lm(totfatrte~d81+d82+d83+d84+d85+d86+d87+d88+d89+d90+d91+d92+d93+d94+d95+d96+d97+d98+d99+d00+d01+d02+d03+d04,data=df)
+summary(reg1)
+#All dummy variables are statistically significant except d81.
+```
+```{r}
+#2
+reg2<-lm(totfatrte~d81+d82+d83+d84+d85+d86+d87+d88+d89+d90+d91+d92+d93+d94+d95+d96+d97+d98+d99+d00+d01+d02+d03+d04+bac08+bac10+perse+sbprim+sbsecon+sl70plus+gdl+perc14_24+unem+vehicmilespc,data=df)
+summary(reg2)
+#Increase in blood alcohol limit (0.08)by 1 is associated with a decrease in totfatrte by -2.498
+#Increase in blood alcohol limit (0.1)  by 1 is associated with a decrease in totfatrte by -1.418
+#Per se law has negative effect on total fatalities with the coefficient is -0.62
+```
+```{r}
+#3
+reg3<-plm(totfatrte~d81+d82+d83+d84+d85+d86+d87+d88+d89+d90+d91+d92+d93+d94+d95+d96+d97+d98+d99+d00+d01+d02+d03+d04+bac08+bac10+perse+sbprim+sbsecon+sl70plus+gdl+perc14_24+unem+vehicmilespc,data=df,model = 'within',index = c('state'))
+stargazer(reg2,reg3,type='text',digits =5)
+summary(reg3)
+#The coef of bac08,bac10,perse and sbprim have decreased in the fixed effect model.The stand error has decreased.;
+```
+```{r}
+#4
+#1000 times increase in the number of miles driven per capita would cause an increase in number of total fatalities by 2.9 new death cases per 100 000 population
+```
+```{r}
+#5
+reg4<-coeftest(reg3, vcov=vcovHC(reg3, type="sss", cluster="group")) 
+stargazer(reg3,reg4,type='text')
+#All policy variables are now more statistically significant after recalculating regression with cluster robust standard errors. Standard errors have decreased while the coefs remained unchanged.
+```

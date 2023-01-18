@@ -1,0 +1,549 @@
+---
+title: "EconometricsIII_Task1_Group_9"
+output:
+  html_document:
+    df_print: paged
+---
+## PART 1
+
+### a
+```{r, echo=TRUE}
+b0<-13
+b1<-sqrt(7)
+b2<-(-2.12)
+```
+
+
+### b
+```{r, echo=TRUE}
+x<-runif(100, min=121, max = 256)
+hist(x)
+```
+
+
+### c
+```{r, echo=TRUE}
+e<-rnorm(100)
+hist(e)
+```
+
+### d
+```{r, echo=TRUE}
+y<-b0+b1*x+b2*e
+```
+
+### e
+```{r, echo=TRUE}
+mod<-lm(y~x)
+b1_est<-mod$coefficients[2]
+```
+
+### f
+```{r, echo=TRUE}
+c<-sum(y)/sum(x)
+c
+```
+
+
+### g
+```{r, echo=TRUE}
+for(j in 1:2000) {
+  x<-runif(100, min=121, max = 256)
+  e<-rnorm(100)
+  y<-b0+b1*x+b2*e
+  mod<-lm(y~x)
+  b1_est[j]<-mod$coefficients[2]
+  c[j]<-sum(y)/sum(x)
+}
+```
+
+### h
+```{r, echo=TRUE}
+hist(b1_est)
+hist(c)
+```
+
+
+### i
+```{r, echo=TRUE}
+(B<-mean(b1_est))
+(C<-mean(c))
+
+```
+
+
+### j
+```{r, echo=TRUE}
+(VB<-var(b1_est))
+(VC<-var(c))
+```
+
+## part I.2
+```{r, echo=TRUE}
+rm(list=ls())
+# a
+b0<-8
+b1<-sqrt(15) #3,87
+b2<-(1/3) #0,333
+b3<-1.1
+
+# b
+x1<-runif(100, min=11, max = 22)
+x2<-runif(100, min=15, max = 51)
+
+#c
+e<-rnorm(100)
+
+#d
+y<-b0*(x1^b1)*(x2^b2)*(exp(e))
+
+#e
+mod<-lm(log(y)~log(x1)+log(x2))
+b1_est<-mod$coefficients[2]
+b2_est<-mod$coefficients[3]
+
+#f
+
+mod2<-lm(log(y)~x1+x2)
+c1<-mod2$coefficients[2]
+c2<-mod2$coefficients[3]
+
+#g
+for(j in 1:2000) {
+  x1<-runif(100, min=11, max = 22)
+  x2<-runif(100, min=15, max = 51)
+  e<-rnorm(100)
+  y<-b0*(x1^b1)*(x2^b2)*(exp(e))
+  mod<-lm(log(y)~log(x1)+log(x2))
+  b1_est[j]<-mod$coefficients[2]
+  b2_est[j]<-mod$coefficients[3]
+  mod2<-lm(log(y)~x1+x2)
+  c1[j]<-mod2$coefficients[2]
+  c2[j]<-mod2$coefficients[3]
+  
+}
+
+# h
+hist(b1_est)
+hist(c1)
+hist(b2_est)
+hist(c2)
+
+#i
+(B1<-mean(b1_est))
+(C1<-mean(c1))
+(B2<-mean(b2_est))
+(C2<-mean(c2))
+
+#j
+(VB1<-var(b1_est))
+(VC1<-var(c1))
+(VB2<-var(b2_est))
+(VC2<-var(c2))
+```
+
+```{r}
+library("MASS")
+library("dplyr")
+library("stargazer")
+```
+
+## part I.3
+
+### a
+```{r, echo=TRUE}
+rm(list=ls())
+(nObs <-2500)
+```
+
+### b
+```{r, echo=TRUE}
+set.seed(12345)
+```
+
+### c 
+```{r, echo=TRUE}
+r = 0.3
+
+Sigma=matrix(c(1,r,r,1), nrow=2)
+data = MASS::mvrnorm(n=nObs, mu=c(0,0),Sigma=Sigma, empirical=TRUE)
+data <- as.data.frame(data)
+var(data["V1"]) #1
+var(data["V2"]) #1
+cov(data["V1"], data["V2"]) #0.3
+```
+
+### d
+```{r, echo=TRUE}
+error_terms = mvtnorm::rmvt(n=nObs, sigma=matrix(c(1,0.5,0.5,1), nrow=2), df = Inf, type = c("Kshirsagar"))
+error_terms <- as.data.frame(error_terms)
+mean(error_terms[["V1"]]) #0
+mean(error_terms[["V2"]]) #0
+var(error_terms["V1"]) #1
+var(error_terms["V2"]) #1
+cov(error_terms["V1"], error_terms["V2"]) #0.5
+data$e1 <- error_terms$V1
+data$e2 <- error_terms$V2
+#plot(error_terms)
+
+```
+We changed df from 1 to Inf in order to reduce errors.
+
+### e
+```{r, echo=TRUE}
+data$d <- ifelse(6*data$V1 + 10*data$V2 + 1*data$e1  > 0, 1, 0)
+prop.table(table(data$d))
+```
+
+### f
+```{r, echo=TRUE}
+b0<-8
+b1<-sqrt(15)
+b2<-(1/3)
+b3<-1.1
+
+y <- b0 + b1*data$V1 + b2*data$V2 + b3*data$d + data$e2
+```
+
+### g
+```{r, echo=TRUE}
+mod1 = lm(data=data, y ~ d)
+mod2 = lm(data=data, y ~ d + V1)
+mod3 = lm(data=data, y ~ d + V1+ V2)
+stargazer(mod1, mod2, mod3, type="text")
+```
+
+### h
+```{r, echo=TRUE}
+b1_hat_1 = NULL
+b1_hat_2 = NULL
+b1_hat_3 = NULL
+b2_hat_2 = NULL
+b2_hat_3 =  NULL
+b3_hat_3 = NULL
+for(i in 1:2000) {
+  error_terms = mvtnorm::rmvt(n=nObs, sigma=matrix(c(1,0.5,0.5,1), nrow=2), df = Inf, type = c("Kshirsagar"))
+  error_terms <- as.data.frame(error_terms)
+  data$e1 <- error_terms$V1
+  data$e2 <- error_terms$V2
+  data$d <- ifelse(6*data$V1 + 10*data$V2 + 1*data$e1  > 0, 1, 0)
+  b0<-8
+  b1<-sqrt(15)
+  b2<-(1/3)
+  b3<-1.1
+  y <- b0 + b1*data$V1 + b2*data$V2 + b3*data$d + data$e2
+  mod1 = lm(data=data, y ~ d)
+  mod2 = lm(data=data, y ~ d + V1)
+  mod3 = lm(data=data, y ~ d + V1+ V2)
+  b1_hat_1[i] = mod1$coefficients[2]
+  b1_hat_2[i] = mod2$coefficients[2]
+  b1_hat_3[i] = mod3$coefficients[2]
+  b2_hat_2[i] = mod2$coefficients[3]
+  b2_hat_3[i] = mod3$coefficients[3]
+  b3_hat_3[i] = mod3$coefficients[4]
+}
+```
+
+### i
+```{r, echo=TRUE}
+hist(b1_hat_1)
+hist(b1_hat_2)
+hist(b1_hat_3)
+mean(b1_hat_1)
+mean(b1_hat_2) 
+mean(b1_hat_3) 
+
+hist(b2_hat_2)
+hist(b2_hat_3)
+mean(b2_hat_2)
+mean(b2_hat_3)
+
+hist(b3_hat_3)
+mean(b3_hat_3)
+```
+
+### j
+```{r, echo=TRUE}
+nObs = 5000
+for(i in 1:2000) {
+  Sigma=matrix(c(1,r,r,1), nrow=2)
+  data = MASS::mvrnorm(n=nObs, mu=c(0,0),Sigma=Sigma, empirical=TRUE)
+  data <- as.data.frame(data)
+  error_terms = mvtnorm::rmvt(n=nObs, sigma=matrix(c(1,0.5,0.5,1), nrow=2), df = Inf, type = c("Kshirsagar"))
+  error_terms <- as.data.frame(error_terms)
+  data$e1 <- error_terms$V1
+  data$e2 <- error_terms$V2
+  data$d <- ifelse(6*data$V1 + 10*data$V2 + 1*data$e1  > 0, 1, 0)
+  b0<-8
+  b1<-sqrt(15)
+  b2<-(1/3)
+  b3<-1.1
+  y <- b0 + b1*data$V1 + b2*data$V2 + b3*data$d + data$e2
+  #mod1 = lm(data=data, y ~ d)
+  #mod2 = lm(data=data, y ~ d + V1)
+  mod3 = lm(data=data, y ~ d + V1+ V2)
+  #b1_hat_1[i] = mod1$coefficients[2]
+  #b1_hat_2[i] = mod2$coefficients[2]
+  b1_hat_3[i] = mod3$coefficients[2]
+  #b2_hat_2[i] = mod2$coefficients[3]
+  #b2_hat_3[i] = mod3$coefficients[3]
+  #b3_hat_3[i] = mod3$coefficients[4]
+}
+
+#mean(b1_hat_1)
+#mean(b1_hat_2)
+hist(b1_hat_3, main = sprintf("%s %s", nObs, mean(b1_hat_3)))
+```
+```{r}
+nObs = 5000
+b1_hat = NULL
+b2_hat = NULL
+b3_hat = NULL
+for(i in 1:2000) {
+  Sigma=matrix(c(1,r,r,1), nrow=2)
+  data = MASS::mvrnorm(n=nObs, mu=c(0,0),Sigma=Sigma, empirical=TRUE)
+  data <- as.data.frame(data)
+  error_terms = mvtnorm::rmvt(n=nObs, sigma=matrix(c(1,0.5,0.5,1), nrow=2), df = Inf, type = c("Kshirsagar"))
+  error_terms <- as.data.frame(error_terms)
+  data$e1 <- error_terms$V1
+  data$e2 <- error_terms$V2
+  data$d <- ifelse(6*data$V1 + 10*data$V2 + 1*data$e1  > 0, 1, 0)
+  b0<-8
+  b1<-sqrt(15)
+  b2<-(1/3)
+  b3<-1.1
+  y <- b0 + b1*data$V1 + b2*data$V2 + b3*data$d + data$e2
+  mod3 = lm(data=data, y ~ d + V1+ V2)
+  b1_hat[i] = mod3$coefficients[2]
+  b2_hat[i] = mod3$coefficients[3]
+  b3_hat[i] = mod3$coefficients[4]
+}
+
+nObs
+mean(b1_hat)
+mean(b2_hat)
+mean(b3_hat)
+```
+
+```{r setup, pressure, include=FALSE}
+#PART 2
+#BLOCK 1
+library(foreign)
+library(skedastic)
+library(wooldridge)
+library(dplyr)
+library(stargazer)
+library(corrplot)
+library(car)
+library(jtools)
+library(tidyverse)
+library(lmtest)
+library(sandwich)
+library(het.test)
+library(ggplot2)
+rm(list = ls())
+load('FarmsUA.Rdata')
+
+```
+```{r}
+#INFL
+infl1<-read.csv('Inflation1.csv')
+
+# rename year variable
+colnames(infl1)[1]<-'yr'
+
+# match inflation and 50sx datasets
+i.year<-match(ndt$year,infl1$yr)
+ndt<-cbind(ndt,infl1[i.year,])
+
+```
+
+
+```{r}
+#TOTAL REVENUE
+ndt$y.<-ndt$crop_revenue+ndt$livest_revenue
+ndt<-ndt[!ndt$y.==0,]
+```
+
+
+```{r}
+###LABOUR
+#TOTAL LABOR
+ndt$laborcost<-(ndt$labor_plant+ndt$labor_livest)
+```
+
+```{r}
+ndt$depr<-ndt$depreciation_livest+ndt$depreciation_crop
+# nominal combined fuel and energy costs
+ndt$fuel.energycost<-ndt$fuelcost_crop+ndt$fuelcost_livest+ndt$energycost_crop+
+                     ndt$energycost_livest
+
+#nominal other costs
+ndt$othercost<-((ndt$totcost_crop+ndt$totcost_livest)-
+                 (ndt$matcost_livest+ndt$matcost_crop)-
+                 (ndt$depreciation_livest+ndt$depreciation_crop)-
+                 (ndt$laborcost_livest+ndt$laborcost_crop-ndt$rent_land))+
+                  ndt$sparepartscost_crop+
+                  ndt$sparepartscost_livest
+
+```
+
+```{r}
+# RENAME VARIABLES ################
+ndt$tcost<-(ndt$totcost_livest+ndt$totcost_crop)
+ndt$arland<-ndt$arable_land # arable land
+ndt$agland<-ndt$agr_land    # agricultural land
+ndt$rentland<-ndt$rent_land
+ndt$rentprop<-ndt$rent_property
+ndt$pig<-ndt$pigs_heads
+ndt$vrh<-ndt$vrh_heads
+ndt$pt<-ndt$poultry_head
+ndt$cow<-ndt$cows_heads
+```
+```{r}
+ndt$tlu<-with(ndt,cow*0.7+vrh*0.7+pt*0.01+pig*0.2)
+
+```
+
+```{r}
+#FIXED COSTS
+ndt$fxc<-with(ndt,rentland+rentprop+depr)
+#VARIABLE COSTS
+ndt$vrc<-with(ndt,tcost-fxc-laborcost)
+ndt<-ndt[ndt$vrc>=0,]
+
+##DUMIES FOR HANDLING ZEROES
+ndt$d.tlu<-!ndt$tlu==0 
+ndt$d.vrc<-!ndt$vrc==0
+ndt$d.laborcost<-!ndt$laborcost==0
+ndt$d.labor<-!ndt$laborcost==0
+ndt$d.agland<-!ndt$agland==0
+ndt$d.arland<-!ndt$arland==0
+```
+
+```{r}
+
+ndt<-ndt[!ndt$agland==0,]  # agriculture should be with the agland! 
+ndt<-ndt[ndt$rentland>0,] #because we are looking for real price for land
+ndt<-ndt[!ndt$arland==0,]
+
+# turn into the logarithms
+ndt$ln.vrc<-log(ndt$vrc+1)
+ndt$ln.laborcost<-log(ndt$laborcost+1)
+ndt$ln.labor<-log(ndt$laborcost+1)
+ndt$ln.arland<-log(ndt$arland+1)
+ndt$ln.agland<-log(ndt$agland+1)
+ndt$ln.tlu<-log(ndt$tlu+1)
+ndt$lny<-log(ndt$y.)
+
+# demeaned logarithms (to be used in production function)
+ndt$lnm.vrc<-log(ndt$vrc/mean(ndt$vrc[ndt$d.vrc])+1)
+ndt$lnm.laborcost<-log(ndt$laborcost/mean(ndt$laborcost[ndt$d.laborcost])+1)
+ndt$lnm.labor<-log(ndt$laborcost/mean(ndt$laborcost[ndt$d.labor])+1)
+ndt$lnm.arland<-log(ndt$arland/mean(ndt$arland)+1)
+ndt$lnm.agland<-log(ndt$agland/mean(ndt$agland)+1)
+ndt$lnm.tlu<-log(ndt$tlu/mean(ndt$tlu[ndt$d.tlu])+1)
+ndt$lnym<-log(ndt$y./mean(ndt$y.))
+
+```
+
+```{r}
+#Summary
+summary(ndt$arland)
+summary(ndt$vrc)
+summary(ndt$tlu)
+summary(ndt$laborcost)
+summary(ndt$y.)
+sd(ndt$arland)
+sd(ndt$vrc)
+sd(ndt$tlu)
+sd(ndt$laborcost)
+sd(ndt$y.)
+```
+
+```{r}
+# start checking for outliers
+boxplot(ndt$lnym)
+outliers <- boxplot(ndt$lnym, plot=FALSE)$out
+ndt<- ndt[-which(ndt$lnym %in% outliers),]
+
+boxplot(ndt$lnm.arland)
+outliers <- boxplot(ndt$lnm.arland, plot=FALSE)$out
+ndt<- ndt[-which(ndt$lnm.arland %in% outliers),]
+
+boxplot(ndt$lnm.vrc)
+outliers <- boxplot(ndt$lnm.vrc, plot=FALSE)$out
+ndt<- ndt[-which(ndt$lnm.vrc %in% outliers),]
+
+boxplot(ndt$lnm.laborcost)
+outliers <- boxplot(ndt$lnm.laborcost, plot=FALSE)$out
+ndt<- ndt[-which(ndt$lnm.laborcost %in% outliers),]
+
+boxplot(ndt$lnm.tlu)
+outliers <- boxplot(ndt$lnm.tlu, plot=FALSE)$out
+ndt<- ndt[-which(ndt$lnm.tlu %in% outliers),]
+
+boxplot(ndt$lnm.tlu)
+outliers <- boxplot(ndt$lnm.tlu, plot=FALSE)$out
+ndt<- ndt[-which(ndt$lnm.tlu %in% outliers),]
+
+```
+
+
+
+```{r}
+ndt1<-ndt[ndt$yr==2012,] 
+```
+
+```{r}
+#BLOCK 2
+#Cobb-Douglas production function (in logarifmic form)
+reg2<- lm(lnym~lnm.arland+lnm.vrc+lnm.laborcost+lnm.tlu, data=ndt1)
+summary(reg2)
+```
+```{r}
+#TRANSLOG
+reg3<- lm(lnym~lnm.arland+lnm.vrc+lnm.laborcost+lnm.tlu+I(0.5*(ndt1$lnm.arland^2))+I(0.5*(ndt1$lnm.vrc)^2)+I(0.5*(lnm.laborcost)^2)+I(0.5*(lnm.tlu^2))+I(lnm.arland*lnm.vrc)+I(lnm.arland*lnm.laborcost)+I(lnm.vrc*lnm.laborcost)+I(lnm.tlu*lnm.arland) +I(lnm.tlu*lnm.vrc)+I(lnm.tlu*lnm.laborcost), data=ndt1)
+summary(reg3)
+```
+```{r}
+#Choosing between specifications
+waldtest(reg2, reg3)
+lrtest(reg2, reg3)
+#Translog is preferred
+```
+```{r}
+bptest(reg3)
+```
+```{r}
+#MULTICOL TEST
+y<-data.frame(ndt1$lnm.arland, ndt1$lnm.vrc, ndt1$lnm.tlu, ndt1$lnm.laborcost, ndt1$lnym)
+corrplot(cor(y))
+cor(y)
+```
+
+```{r}
+#BLOCK 3
+#Marginal Revenue
+der<-reg3$coefficients[2]+I(reg3$coefficients[6]*ndt1$lnm.arland)+I(reg3$coefficients[10]*ndt1$lnm.vrc)+I(reg3$coefficients[11]*ndt1$lnm.laborcost)+I(reg3$coefficients[13]*ndt1$lnm.tlu)
+```
+```{r}
+#Marginal Costs
+ndt1$mrc<-ndt1$rent_land/ndt1$arland
+```
+```{r}
+mean(ndt1$mrc)
+mean(der)
+mean(der)/mean(ndt1$mrc)
+# histograms of MC and MR 
+
+hist(der, xlim=c(0,4), ylim=c(0,450), col='navyblue', breaks=sqrt(nrow(ndt1)), 
+     xlab='MC/MR', main='Histogram of MC/MR')
+hist(ndt1$mrc, xlim=c(0,4),ylim=c(0,450),col='yellow', breaks=sqrt(nrow(ndt1)), add=TRUE)
+legend("topright", c("MR", "MC"), fill=c("navyblue", "yellow"))
+```
+
+```{r}
+mean(ndt1$mrc)/mean(der)*100
+```
+

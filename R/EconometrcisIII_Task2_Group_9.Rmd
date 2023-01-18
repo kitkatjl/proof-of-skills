@@ -1,0 +1,463 @@
+---
+title: "Econ3_Task2_Group_9"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+## part I.1
+
+```{r}
+library(plm)
+library(stargazer)
+```
+
+
+### a
+```{r, echo=TRUE}
+rm(list=ls())
+npersons <- 200
+nobs<-10
+```
+
+
+### b
+```{r, echo=TRUE}
+set.seed(12345)
+```
+
+
+### c
+```{r, echo=TRUE}
+data = rnorm(npersons)
+data <- as.data.frame(data)
+colnames(data)[1] <- "id"
+hist(data$id)
+var(data["id"]) #1
+```
+
+### d
+```{r, echo=TRUE}
+r = 0.1
+Sigma=matrix(c(1,r,r,1), nrow=2)
+df = MASS::mvrnorm(n=npersons*nobs, mu=c(0,0), Sigma=Sigma, empirical=TRUE)
+df <- as.data.frame(df)
+colnames(df)[1] <- "x.base"
+colnames(df)[2] <- "z"
+var(df["x.base"]) #1
+var(df["z"]) #1
+cov(df["x.base"], df["z"]) #0.3
+```
+
+### e
+```{r, echo=TRUE}
+for (individual in 1:npersons){
+  for (tf in 1:nobs){
+    index = (individual-1)*nobs + tf
+    df$id[index] = data$id[individual]
+    df$x[index] = df$x.base[index] + 0.8 * df$id[index]
+    df$tr[index] = tf
+  }  
+}
+```
+
+### f
+```{r, echo=TRUE}
+df$e1 <- rnorm(npersons*nobs)
+```
+
+
+### g
+```{r, echo=TRUE}
+b0<-8
+b1<-3
+b2<-2
+
+df$y.fe <- b0 + b1*df$x + b2*df$z + df$id + df$e1
+df$a<- df$id+df$e1
+df$y.re = b0 + b1*df$x.base + b2*df$z + df$id +df$e1
+
+reg<-lm(a ~ x + z, data=df)
+summary(reg)
+#correlated with x
+
+reg1<-lm(a ~ x.base + z, data=df)
+summary(reg1)
+#not correlated with neither x.base nor z
+```
+
+### h
+```{r, echo=TRUE}
+
+df1 <- pdata.frame(df, index=c('id', 'tr'))
+
+reg2 <- plm(y.fe~ x + z, data = df1, model = "pooling")
+reg3 <- plm(y.fe~ x + z, data = df1, model = "within")
+reg4 <- lm (y.fe~ x + z + id, data = df1)
+reg5 <- plm(y.fe~ x + z, data = df1, model = "fd")
+reg6 <- plm(y.fe~ x + z, data = df1, model = "random")
+
+reg3$coefficients
+
+reg7 <- plm(y.re~ x + z, data = df1, model = "pooling")
+reg8 <- plm(y.re~ x + z, data = df1, model = "within")
+reg9 <- lm (y.re~ x + z + as.factor(id) , data = df1)
+reg10 <- plm(y.re~ x + z, data = df1, model = "fd")
+reg11 <- plm(y.re~ x + z, data = df1, model = "random")
+
+#stargazer(reg7, reg8, reg9, reg10, reg11, type = "text")
+```
+
+
+### i
+```{r, echo=TRUE}
+b1_hat_reg2 = NULL
+b2_hat_reg2 = NULL
+b1_hat_reg3 = NULL
+b2_hat_reg3 = NULL
+b1_hat_reg4 = NULL
+b2_hat_reg4 = NULL
+b1_hat_reg5 = NULL
+b2_hat_reg5 = NULL
+b1_hat_reg6 = NULL
+b2_hat_reg6 = NULL
+b1_hat_reg7 = NULL
+b2_hat_reg7 = NULL
+b1_hat_reg8 = NULL
+b2_hat_reg8 = NULL
+b1_hat_reg9 = NULL
+b2_hat_reg9 = NULL
+b1_hat_reg10 = NULL
+b2_hat_reg10 = NULL
+b1_hat_reg11 = NULL
+b2_hat_reg11 = NULL
+b0<-8
+b1<-3
+b2<-2
+
+for(sample in 1:2000) {
+  print(sample)
+  df$e1 <- rnorm(npersons*nobs)
+  df$y.fe <- b0 + b1*df$x + b2*df$z + df$id + df$e1
+  df$a<- df$id+df$e1
+  df$y.re = b0 + b1*df$x.base + b2*df$z + df$id +df$e1
+  df1 <- pdata.frame(df, index=c('id', 'tr'))
+
+  reg2 <- plm(y.fe~ x + z, data = df1, model = "pooling")
+  b1_hat_reg2[sample] = reg2$coefficients[2]
+  b2_hat_reg2[sample] = reg2$coefficients[3]
+  reg3 <- plm(y.fe~ x + z, data = df1, model = "within")
+  b1_hat_reg3[sample] = reg3$coefficients[1]
+  b2_hat_reg3[sample] = reg3$coefficients[2]
+  reg4 <- lm (y.fe~ x + z + id, data = df1)
+  b1_hat_reg4[sample] = reg4$coefficients[2]
+  b2_hat_reg4[sample] = reg4$coefficients[3]
+  reg5 <- plm(y.fe~ x + z, data = df1, model = "fd")
+  b1_hat_reg5[sample] = reg5$coefficients[2]
+  b2_hat_reg5[sample] = reg5$coefficients[3]
+  reg6 <- plm(y.fe~ x + z, data = df1, model = "random")
+  b1_hat_reg6[sample] = reg6$coefficients[2]
+  b2_hat_reg6[sample] = reg6$coefficients[3]
+
+  reg7 <- plm(y.re~ x + z, data = df1, model = "pooling")
+  b1_hat_reg7[sample] = reg7$coefficients[2]
+  b2_hat_reg7[sample] = reg7$coefficients[3]
+  reg8 <- plm(y.re~ x + z, data = df1, model = "within")
+  b1_hat_reg8[sample] = reg8$coefficients[1]
+  b2_hat_reg8[sample] = reg8$coefficients[2]
+  reg9 <- lm (y.re~ x + z + as.factor(id) , data = df1)
+  b1_hat_reg9[sample] = reg9$coefficients[2]
+  b2_hat_reg9[sample] = reg9$coefficients[3]
+  reg10 <- plm(y.re~ x + z, data = df1, model = "fd")
+  b1_hat_reg10[sample] = reg10$coefficients[2]
+  b2_hat_reg10[sample] = reg10$coefficients[3]
+  reg11 <- plm(y.re~ x + z, data = df1, model = "random")
+  b1_hat_reg11[sample] = reg10$coefficients[2]
+  b2_hat_reg11[sample] = reg10$coefficients[3]
+}
+```
+
+
+### j
+```{r, echo=TRUE}
+hist(b1_hat_reg2)
+hist(b2_hat_reg2)
+hist(b1_hat_reg3)
+hist(b2_hat_reg3)
+hist(b1_hat_reg4)
+hist(b2_hat_reg4)
+hist(b1_hat_reg5)
+hist(b2_hat_reg5)
+hist(b1_hat_reg6)
+hist(b2_hat_reg6)
+hist(b1_hat_reg7)
+hist(b2_hat_reg7)
+hist(b1_hat_reg8)
+hist(b2_hat_reg8)
+hist(b1_hat_reg9)
+hist(b2_hat_reg9)
+hist(b1_hat_reg10)
+hist(b2_hat_reg10)
+hist(b1_hat_reg11)
+hist(b2_hat_reg11)
+```
+```{r setup, pressure, include=FALSE}
+#PART 2
+#BLOCK 1
+library(foreign)
+library(skedastic)
+library(wooldridge)
+library(dplyr)
+library(stargazer)
+library(corrplot)
+library(car)
+library(jtools)
+library(tidyverse)
+library(lmtest)
+library(sandwich)
+library(het.test)
+library(ggplot2)
+library(plm)
+
+load('FarmsUA.Rdata')
+
+```
+```{r}
+#INFL
+infl1<-read.csv('Inflation1.csv')
+
+# rename year variable
+colnames(infl1)[1]<-'yr'
+
+# match inflation and 50sx datasets
+i.year<-match(ndt$year,infl1$yr)
+ndt<-cbind(ndt,infl1[i.year,])
+
+```
+
+
+```{r}
+#TOTAL REVENUE
+ndt$y.crop<-ndt$crop_revenue/ndt$Crop
+ndt$y.lvstk<-ndt$livest_revenue/ndt$Livestock
+ndt$y.<-ndt$y.crop+ndt$y.lvstk
+
+```
+
+```{r}
+# real or deflated costs of feed
+ndt$x.feed<-ndt$feedcost/ndt$Crop
+
+# real or deflated costs of seed
+ndt$x.seed<-ndt$seedcost/ndt$Crop
+
+#real of deflated costs of chemicals
+ndt$x.fert<-ndt$fert/ndt$chemicals
+
+#labour costs
+ndt$x.labor<-ndt$labor_plant+ndt$labor_livest # total (physical) labor used in crop and livestock productions
+
+#deflating labour costs
+ndt$x.laborcost_crop<-ndt$laborcost_crop/ndt$wage # labor costs in crop production
+ndt$x.laborcost_livest<-ndt$laborcost_livest/ndt$wage # labor costs in livestock production
+ndt$x.laborcost<-ndt$x.laborcost_crop+ndt$x.laborcost_livest # total labor costs
+
+# deflating energy costs in crop and livestock production
+ndt$x.energycost_crop<-ndt$energycost_crop/ndt$electricity # energy costs in crops
+ndt$x.energycost_livest<-ndt$energycost_livest/ndt$electricity # energy costs in livestock
+ndt$x.energy<-ndt$x.energycost_livest+ndt$x.energycost_crop # total energy costs
+
+
+#deflating fuel costs
+ndt$x.fuelcost_crop<-ndt$fuelcost_crop/ndt$fuel # fuel costs in crops
+ndt$x.fuelcost_livest<-ndt$fuelcost_livest/ndt$fuel # fuel costs in livestock
+ndt$x.fuel<-ndt$x.fuelcost_livest+ndt$x.fuelcost_crop # total fuel costs
+
+# combine fuel and energy costs into one aggregate input
+ndt$x.fuel.energy<-ndt$x.energy+ndt$x.fuel
+
+# nominal combined fuel and energy costs
+ndt$fuel.energycost<-ndt$fuelcost_crop+ndt$fuelcost_livest+ndt$energycost_crop+ndt$energycost_livest
+
+
+# spare parts costs: deflated
+ndt$x.sparepartscost_crop<-ndt$sparepartscost_crop/ndt$machines
+ndt$x.sparepartscost_livest<-ndt$sparepartscost_livest/ndt$machines
+ndt$x.spareparts<-ndt$x.sparepartscost_livest+ndt$x.sparepartscost_crop
+
+
+#depreciation
+ndt$x.depreciation_crop<-ndt$depreciation_crop/ndt$machines
+ndt$x.depreciation_livest<-ndt$depreciation_livest/ndt$machines
+ndt$x.depr<-ndt$x.depreciation_livest+ndt$x.depreciation_crop
+ndt$depr<-ndt$depreciation_livest+ndt$depreciation_crop # nominal
+
+#deflated other costs
+ndt$x.othercost<-((ndt$totcost_crop+ndt$totcost_livest)-
+                 (ndt$matcost_livest+ndt$matcost_crop)-
+                 (ndt$depreciation_livest+ndt$depreciation_crop)-
+                 (ndt$laborcost_livest+ndt$laborcost_crop-ndt$rent_land))/ndt$cpi
+
+#nominal other costs
+ndt$othercost<-((ndt$totcost_crop+ndt$totcost_livest)-
+                 (ndt$matcost_livest+ndt$matcost_crop)-
+                 (ndt$depreciation_livest+ndt$depreciation_crop)-
+                 (ndt$laborcost_livest+ndt$laborcost_crop-ndt$rent_land))+ndt$sparepartscost_crop+ ndt$sparepartscost_livest
+
+
+# RENAME VARIABLES ################
+ndt$x.tcost<-(ndt$totcost_livest+ndt$totcost_crop)/ndt$cpi
+ndt$x.arland<-ndt$arable_land # arable land
+ndt$x.agland<-ndt$agr_land    # agricultural land
+ndt$x.rentland<-ndt$rent_land
+ndt$x.rentprop<-ndt$rent_property
+ndt$x.pig<-ndt$pigs_heads
+ndt$x.vrh<-ndt$vrh_heads
+ndt$x.pt<-ndt$poultry_head
+ndt$x.cow<-ndt$cows_heads
+
+# input called 'total livestock equivalent': weighted number of animals
+ndt$x.tlu<-with(ndt,x.cow*0.7+x.vrh*0.7+x.pt*0.01+x.pig*0.2)
+ndt$d.tlu<-!ndt$x.tlu==0  # dummy for tlu, i.e. for availability of livestock on the farm
+
+# fixed costs
+ndt$x.fxc<-with(ndt,x.rentland+x.rentprop+x.depr)
+ndt$d.fxc<-!ndt$x.fxc==0
+
+# variable costs
+ndt$x.vrc<-with(ndt,x.tcost-x.fxc-x.laborcost)
+ndt<-ndt[ndt$x.vrc>=0,]
+
+
+# dummies for zero inputs
+ndt$d.vrc<-!ndt$x.vrc==0
+ndt$d.laborcost<-!ndt$x.laborcost==0
+ndt$d.labor<-!ndt$x.labor==0
+ndt$d.agland<-!ndt$x.agland==0
+ndt$d.arland<-!ndt$x.arland==0
+
+# turn into the logarithms
+ndt$lnx.fxc<-log(ndt$x.fxc+1)
+ndt$lnx.vrc<-log(ndt$x.vrc+1)
+ndt$lnx.laborcost<-log(ndt$x.laborcost+1)
+ndt$lnx.labor<-log(ndt$x.labor+1)
+ndt$lnx.arland<-log(ndt$x.arland+1)
+ndt$lnx.agland<-log(ndt$x.agland+1)
+ndt$lnx.tlu<-log(ndt$x.tlu+1)
+ndt$lny<-log(ndt$y.)
+
+# demeaned logarithms (to be used in production function)
+ndt$lnxm.fxc<-log(ndt$x.fxc/mean(ndt$x.fxc[ndt$d.fxc])+1)
+ndt$lnxm.vrc<-log(ndt$x.vrc/mean(ndt$x.vrc[ndt$d.vrc])+1)
+ndt$lnxm.laborcost<-log(ndt$x.laborcost/mean(ndt$x.laborcost[ndt$d.laborcost])+1)
+ndt$lnxm.labor<-log(ndt$x.labor/mean(ndt$x.labor[ndt$d.labor])+1)
+ndt$lnxm.arland<-log(ndt$x.arland/mean(ndt$x.arland)+1)
+ndt$lnxm.agland<-log(ndt$x.agland/mean(ndt$x.agland)+1)
+ndt$lnxm.tlu<-log(ndt$x.tlu/mean(ndt$x.tlu[ndt$d.tlu])+1)
+ndt$lnym<-log(ndt$y./mean(ndt$y.))
+```
+
+
+
+```{r}
+ndt<-ndt[!ndt$y.==0,]
+ndt<-ndt[ndt$x.arland>0,]
+ndt<-ndt[ndt$rent_land>0,] #because we are looking for real price for land
+
+```
+
+```{r}
+#Summary
+
+dplyr::select(ndt,x.arland, x.vrc, x.tlu, x.laborcost, y.) %>% stargazer(type="text",digits=1,  iqr = FALSE)
+```
+
+```{r}
+# start checking for outliers
+boxplot(ndt$y.,main='Revenue')
+outliers <- boxplot(ndt$y., plot=FALSE)$out
+ndt<- ndt[-which(ndt$y. %in% outliers),]
+
+boxplot(ndt$x.arland, main= "Arable land")
+outliers <- boxplot(ndt$x.arland, plot=FALSE)$out
+ndt<- ndt[-which(ndt$x.arland %in% outliers),]
+
+boxplot(ndt$x.vrc, main ="Variable cost")
+outliers <- boxplot(ndt$x.vrc, plot=FALSE)$out
+ndt<- ndt[-which(ndt$x.vrc %in% outliers),]
+
+boxplot(ndt$x.laborcost, main = "labor cost")
+outliers <- boxplot(ndt$x.laborcost, plot=FALSE)$out
+ndt<- ndt[-which(ndt$x.laborcost %in% outliers),]
+
+boxplot(ndt$x.tlu, main = "tlu")
+outliers <- boxplot(ndt$x.tlu, plot=FALSE)$out
+ndt<- ndt[-which(ndt$x.tlu %in% outliers),]
+
+
+dplyr::select(ndt,x.arland, x.vrc, x.tlu, x.laborcost, y.) %>% stargazer(type="text", digits=1)
+```
+
+```{r}
+#BLOCK 2
+ndt1 <- pdata.frame(ndt, index = c("ID" , "yr"))
+phtest(lny ~ lnx.arland + lnx.vrc + lnx.laborcost + lnx.tlu, data = ndt1, model=c("random","pooling"))
+
+
+reg1 <- plm(lny ~ lnx.arland + lnx.vrc + lnx.laborcost + lnx.tlu, data = ndt1, model="pooling")
+summary(reg1)
+
+elast <- reg1$coefficients[2]
+ndt1$marginal_revenue <- elast*ndt1$y./ndt1$x.arland
+mr_cd<-mean(ndt1$marginal_revenue)
+ndt1$marginal_cost <- ndt1$rent_land/ndt1$x.arland
+mc<-mean(ndt1$marginal_cost)
+mr_cd/mc
+```
+```{r}
+#TRANSLOG
+
+reg3 <- plm(lny ~lnx.arland+lnx.vrc+lnx.laborcost+lnx.tlu+I(0.5*(lnx.arland^2))+I(0.5*(lnx.vrc)^2)+I(0.5*(lnx.laborcost)^2)+I(0.5*(lnx.tlu^2))+I(lnx.arland*lnx.vrc)+I(lnx.arland*lnx.laborcost)+I(lnx.vrc*lnx.laborcost)+I(lnx.tlu*lnx.arland) +I(lnx.tlu*lnx.vrc)+I(lnx.tlu*lnx.laborcost), data=ndt1, model="pooling")
+summary(reg3)
+```
+```{r}
+#Choosing between specifications
+waldtest(reg1, reg3)
+#lrtest(reg1, reg3)
+#Translog is preferred
+```
+```{r}
+bptest(reg3)
+```
+```{r}
+#MULTICOL TEST
+y<-data.frame(ndt$x.arland, ndt$x.vrc, ndt$x.tlu, ndt$x.laborcost, ndt$y.)
+corrplot(cor(y))
+cor(y)
+```
+
+```{r}
+#BLOCK 3
+#Marginal Revenue
+ndt1$der<-reg3$coefficients[2]+I(reg3$coefficients[6]*ndt1$lnx.arland)+I(reg3$coefficients[10]*ndt1$lnx.vrc)+I(reg3$coefficients[11]*ndt1$lnx.laborcost)+I(reg3$coefficients[13]*ndt1$lnx.tlu)
+
+```
+
+``` {r}
+ndt1$marginal_cost <- ndt1$rent_land/ndt1$x.arland
+mc<-mean(ndt1$marginal_cost)
+mean(ndt1$der)
+mean(ndt1$der)/mc
+
+# histograms of MC and MR 
+hist(ndt1$der, xlim=c(0,1.5), ylim=c(0,5000),breaks=55, col='#FFC0AAAA', main='Histogram of MC/MR',xlab='uah, thousand')
+hist(ndt1$marginal_cost, xlim=c(0,1.5), ylim=c(0,5000), breaks=4000, col='#FFFAAAAA', ,add=TRUE)
+legend("topright", c("MC", "MR"), fill=c("#FFFACD", "#FFC0CB"))
+
+```
+
+```{r}
+mean(ndt1$marginal_cost)/mean(ndt1$der)*100
+```
+
